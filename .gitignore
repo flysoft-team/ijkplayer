@@ -25,13 +25,13 @@ ijkmedia/ijkyuv/
 # generated files
 bin/
 gen/
-libs/
 obj/
 
 # Local configuration file (sdk path, etc)
 local.properties
 
 # Android Studio
+.iml
 .idea
 .gradle
 build/
