@@ -297,6 +297,19 @@ IjkMediaPlayer_setVolume(JNIEnv *env, jobject thiz, jfloat leftVolume, jfloat ri
 }
 
 static void
+IjkMediaPlayer_setLooping(JNIEnv *env, jobject thiz, jboolean looping)
+{
+    MPTRACE("IjkMediaPlayer_setLooping");
+    IjkMediaPlayer *mp = jni_get_media_player(env, thiz);
+    JNI_CHECK_GOTO(mp, env, NULL, "mpjni: setLooping: null mp", LABEL_RETURN);
+    
+    ijkmp_android_set_looping(env, mp, looping);
+    
+LABEL_RETURN:
+    ijkmp_dec_ref_p(&mp);
+}
+
+static void
 IjkMediaPlayer_setAvFormatOption(JNIEnv *env, jobject thiz, jobject name, jobject value)
 {
     MPTRACE("IjkMediaPlayer_setAvFormatOption");
@@ -874,6 +887,7 @@ static JNINativeMethod g_methods[] = {
     { "_release", "()V", (void *) IjkMediaPlayer_release },
     { "_reset", "()V", (void *) IjkMediaPlayer_reset },
     { "setVolume", "(FF)V", (void *) IjkMediaPlayer_setVolume },
+    { "setLooping", "(Z)V", (void *) IjkMediaPlayer_setLooping },
     { "native_init", "()V", (void *) IjkMediaPlayer_native_init },
     { "native_setup", "(Ljava/lang/Object;)V", (void *) IjkMediaPlayer_native_setup },
     { "native_finalize", "()V", (void *) IjkMediaPlayer_native_finalize },

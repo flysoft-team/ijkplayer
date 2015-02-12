@@ -205,7 +205,12 @@ public class AndroidMediaPlayer extends SimpleMediaPlayer {
         mInternalMediaPlayer.setVolume(leftVolume, rightVolume);
     }
 
-    @Override
+	@Override
+	public void setLooping(boolean looping) {
+		mInternalMediaPlayer.setLooping(looping);
+	}
+
+	@Override
     public MediaInfo getMediaInfo() {
         if (sMediaInfo == null) {
             MediaInfo module = new MediaInfo();

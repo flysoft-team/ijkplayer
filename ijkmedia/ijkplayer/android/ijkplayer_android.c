@@ -95,6 +95,22 @@ void ijkmp_android_set_volume(JNIEnv *env, IjkMediaPlayer *mp, float left, float
     MPTRACE("ijkmp_android_set_volume(%f, %f)=void", left, right);
 }
 
+void ijkmp_android_set_looping(JNIEnv *env, IjkMediaPlayer *mp, bool looping)
+{
+    if (!mp)
+    return;
+    
+    MPTRACE("ijkmp_android_set_looping(%d)", looping);
+    pthread_mutex_lock(&mp->mutex);
+    
+    if (mp && mp->ffplayer) {
+        mp->ffplayer->loop = looping ? 0 : 1;
+    }
+    
+    pthread_mutex_unlock(&mp->mutex);
+    MPTRACE("ijkmp_android_set_looping(%d)=void", looping);
+}
+
 void ijkmp_android_set_mediacodec_select_callback(IjkMediaPlayer *mp, bool (*callback)(void *opaque, ijkmp_mediacodecinfo_context *mcc), void *opaque)
 {
     if (!mp)

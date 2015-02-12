@@ -38,6 +38,7 @@ IjkMediaPlayer *ijkmp_android_create(int(*msg_loop)(void*));
 
 void ijkmp_android_set_surface(JNIEnv *env, IjkMediaPlayer *mp, jobject android_surface);
 void ijkmp_android_set_volume(JNIEnv *env, IjkMediaPlayer *mp, float left, float right);
+void ijkmp_android_set_looping(JNIEnv *env, IjkMediaPlayer *mp, bool looping);
 void ijkmp_android_set_mediacodec_select_callback(IjkMediaPlayer *mp, bool (*callback)(void *opaque, ijkmp_mediacodecinfo_context *mcc), void *opaque);
 void ijkmp_android_set_mediacodec_enabled(IjkMediaPlayer *mp, bool enabled);
 void ijkmp_android_set_opensles_enabled(IjkMediaPlayer *mp, bool enabled);

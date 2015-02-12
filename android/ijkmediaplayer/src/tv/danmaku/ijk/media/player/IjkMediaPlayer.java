@@ -47,7 +47,7 @@ import android.view.SurfaceHolder;
 
 /**
  * @author bbcallen
- * 
+ *
  *         Java wrapper of ffplay.
  */
 public final class IjkMediaPlayer extends SimpleMediaPlayer {
@@ -172,13 +172,13 @@ public final class IjkMediaPlayer extends SimpleMediaPlayer {
     /**
      * Sets the {@link SurfaceHolder} to use for displaying the video portion of
      * the media.
-     * 
+     *
      * Either a surface holder or surface must be set if a display or video sink
      * is needed. Not calling this method or {@link #setSurface(Surface)} when
      * playing back a video will result in only the audio track being played. A
      * null surface holder or surface will result in only the audio track being
      * played.
-     * 
+     *
      * @param sh
      *            the SurfaceHolder to use for video display
      */
@@ -201,7 +201,7 @@ public final class IjkMediaPlayer extends SimpleMediaPlayer {
      * does not support {@link #setScreenOnWhilePlaying(boolean)}. Setting a
      * Surface will un-set any Surface or SurfaceHolder that was previously set.
      * A null surface will result in only the audio track being played.
-     * 
+     *
      * If the Surface sends frames to a {@link SurfaceTexture}, the timestamps
      * returned from {@link SurfaceTexture#getTimestamp()} will have an
      * unspecified zero point. These timestamps cannot be directly compared
@@ -209,7 +209,7 @@ public final class IjkMediaPlayer extends SimpleMediaPlayer {
      * source, or multiple runs of the same program. The timestamp is normally
      * monotonically increasing and is unaffected by time-of-day adjustments,
      * but it is reset when the position is set.
-     * 
+     *
      * @param surface
      *            The {@link Surface} to be used for the video portion of the
      *            media.
@@ -227,13 +227,13 @@ public final class IjkMediaPlayer extends SimpleMediaPlayer {
 
     /**
      * Sets the data source (file-path or http/rtsp URL) to use.
-     * 
+     *
      * @param path
      *            the path of the file, or the http/rtsp URL of the stream you
      *            want to play
      * @throws IllegalStateException
      *             if it is called in an invalid state
-     * 
+     *
      *             <p>
      *             When <code>path</code> refers to a local file, the file may
      *             actually be opened by a process other than the calling
@@ -426,6 +426,9 @@ public final class IjkMediaPlayer extends SimpleMediaPlayer {
 
     public native void setVolume(float leftVolume, float rightVolume);
 
+	@Override
+	public native void setLooping(boolean looping);
+
     @Override
     public MediaInfo getMediaInfo() {
         MediaInfo mediaInfo = new MediaInfo();
@@ -496,7 +499,7 @@ public final class IjkMediaPlayer extends SimpleMediaPlayer {
      * @param frameDrop
      *      =0 do not drop any frame
      *      <0 drop as many frames as possible
-     *      >0 display 1 frame per `frameDrop` continuous dropped frames, 
+     *      >0 display 1 frame per `frameDrop` continuous dropped frames,
      */
     public void setFrameDrop(int frameDrop) {
         _setFrameDrop(frameDrop);
@@ -715,7 +718,7 @@ public final class IjkMediaPlayer extends SimpleMediaPlayer {
         OnControlMessageListener listener = player.mOnControlMessageListener;
         if (listener == null)
             return null;
-        
+
         return listener.onControlResolveSegmentUrl(segment);
     }
 
@@ -734,7 +737,7 @@ public final class IjkMediaPlayer extends SimpleMediaPlayer {
         OnControlMessageListener listener = player.mOnControlMessageListener;
         if (listener == null)
             return null;
-        
+
         return listener.onControlResolveSegmentOfflineMrl(segment);
     }
 
@@ -753,7 +756,7 @@ public final class IjkMediaPlayer extends SimpleMediaPlayer {
         OnControlMessageListener listener = player.mOnControlMessageListener;
         if (listener == null)
             return -1;
-        
+
         return listener.onControlResolveSegmentDuration(segment);
     }
 
@@ -801,7 +804,7 @@ public final class IjkMediaPlayer extends SimpleMediaPlayer {
                 return null;
 
             Log.i(TAG, String.format(Locale.US, "onSelectCodec: mime=%s, profile=%d, level=%d", mimeType, profile, level));
-            TreeMap<Integer, IjkMediaCodecInfo> candidateCodecList = new TreeMap<Integer, IjkMediaCodecInfo>(); 
+            TreeMap<Integer, IjkMediaCodecInfo> candidateCodecList = new TreeMap<Integer, IjkMediaCodecInfo>();
             int numCodecs = MediaCodecList.getCodecCount();
             for (int i = 0; i < numCodecs; i++) {
                 MediaCodecInfo codecInfo = MediaCodecList.getCodecInfoAt(i);
