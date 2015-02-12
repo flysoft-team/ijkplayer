@@ -2451,8 +2451,8 @@ static int read_thread(void *arg)
             is->queue_attachments_req = 1;
             eof = 0;
 #ifdef FFP_MERGE
-            if (is->paused)
-                step_to_next_frame(is);
+//            if (is->paused)
+//                step_to_next_frame(is);
 #endif
             completed = 0;
             SDL_LockMutex(ffp->is->play_mutex);
@@ -2463,8 +2463,8 @@ static int read_thread(void *arg)
                 ffp->auto_start = 0;
                 stream_update_pause_l(ffp);
             }
-            if (is->pause_req)
-                step_to_next_frame_l(ffp);
+//            if (is->pause_req)
+//                step_to_next_frame_l(ffp);
             SDL_UnlockMutex(ffp->is->play_mutex);
             ffp_notify_msg1(ffp, FFP_MSG_SEEK_COMPLETE);
             ffp_toggle_buffering(ffp, 1);
