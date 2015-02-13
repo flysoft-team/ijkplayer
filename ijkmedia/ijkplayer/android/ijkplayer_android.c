@@ -111,6 +111,21 @@ void ijkmp_android_set_looping(JNIEnv *env, IjkMediaPlayer *mp, bool looping)
     MPTRACE("ijkmp_android_set_looping(%d)=void", looping);
 }
 
+void ijkmp_android_set_swscale_type(JNIEnv *env, IjkMediaPlayer *mp, int swscaleType){
+    if (!mp)
+        return;
+    
+    MPTRACE("ijkmp_android_set_swscale_type(%d)", swscaleType);
+    pthread_mutex_lock(&mp->mutex);
+    
+    if (mp && mp->ffplayer) {
+        mp->ffplayer->sws_flags = swscaleType;
+    }
+    
+    pthread_mutex_unlock(&mp->mutex);
+    MPTRACE("ijkmp_android_set_swscale_type(%d)=void", swscaleType);
+}
+
 void ijkmp_android_set_mediacodec_select_callback(IjkMediaPlayer *mp, bool (*callback)(void *opaque, ijkmp_mediacodecinfo_context *mcc), void *opaque)
 {
     if (!mp)

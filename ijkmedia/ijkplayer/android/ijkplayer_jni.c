@@ -310,6 +310,19 @@ LABEL_RETURN:
 }
 
 static void
+IjkMediaPlayer_setSwScaleType(JNIEnv *env, jobject thiz, jint swscaleType)
+{
+    MPTRACE("IjkMediaPlayer_setSwScaleType");
+    IjkMediaPlayer *mp = jni_get_media_player(env, thiz);
+    JNI_CHECK_GOTO(mp, env, NULL, "mpjni: setSwScaleType: null mp", LABEL_RETURN);
+    
+    ijkmp_android_set_swscale_type(env, mp, swscaleType);
+    
+LABEL_RETURN:
+    ijkmp_dec_ref_p(&mp);
+}
+
+static void
 IjkMediaPlayer_setAvFormatOption(JNIEnv *env, jobject thiz, jobject name, jobject value)
 {
     MPTRACE("IjkMediaPlayer_setAvFormatOption");
@@ -888,6 +901,7 @@ static JNINativeMethod g_methods[] = {
     { "_reset", "()V", (void *) IjkMediaPlayer_reset },
     { "setVolume", "(FF)V", (void *) IjkMediaPlayer_setVolume },
     { "setLooping", "(Z)V", (void *) IjkMediaPlayer_setLooping },
+    { "setSwScaleType", "(I)V", (void *) IjkMediaPlayer_setSwScaleType },
     { "native_init", "()V", (void *) IjkMediaPlayer_native_init },
     { "native_setup", "(Ljava/lang/Object;)V", (void *) IjkMediaPlayer_native_setup },
     { "native_finalize", "()V", (void *) IjkMediaPlayer_native_finalize },

@@ -63,6 +63,18 @@ public final class IjkMediaPlayer extends SimpleMediaPlayer {
     private static final int MEDIA_ERROR = 100;
     private static final int MEDIA_INFO = 200;
 
+	public static final int SWS_FAST_BILINEAR = 1;
+	public static final int SWS_BILINEAR = 2;
+	public static final int SWS_BICUBIC = 4;
+	public static final int SWS_X = 8;
+	public static final int SWS_POINT = 0x10;
+	public static final int SWS_AREA = 0x20;
+	public static final int SWS_BICUBLIN = 0x40;
+	public static final int SWS_GAUSS = 0x80;
+	public static final int SWS_SINC = 0x100;
+	public static final int SWS_LANCZOS = 0x200;
+	public static final int SWS_SPLINE = 0x400;
+
     protected static final int MEDIA_SET_VIDEO_SAR = 10001;
 
     @AccessedByNative
@@ -428,6 +440,8 @@ public final class IjkMediaPlayer extends SimpleMediaPlayer {
 
 	@Override
 	public native void setLooping(boolean looping);
+
+	public native void setSwScaleType(int swScaleType);
 
     @Override
     public MediaInfo getMediaInfo() {
