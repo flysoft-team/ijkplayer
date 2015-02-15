@@ -28,6 +28,7 @@
 #include "ff_fferror.h"
 #include "ff_ffmsg.h"
 
+void      ffp_set_volume(FFPlayer *ffp, float volume);
 void      ffp_global_init();
 void      ffp_global_uninit();
 void      ffp_global_set_log_report(int use_report);

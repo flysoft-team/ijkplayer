@@ -80,7 +80,7 @@ public interface IMediaPlayer {
 
     public abstract void reset();
 
-    public abstract void setVolume(float leftVolume, float rightVolume);
+    public abstract void setVolume(float volume);
 
 	public abstract void setLooping(boolean looping);
 

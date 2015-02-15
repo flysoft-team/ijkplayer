@@ -74,6 +74,23 @@ static AVPacket flush_pkt;
 
 static void free_picture(Frame *vp);
 
+void ffp_set_volume(FFPlayer *ffp, float volume){
+    ffp->audioVolume = volume;
+    
+    if (!ffp->is || !ffp->is->play_mutex){
+        return;
+    }
+    
+//    SDL_LockMutex(ffp->is->play_mutex);
+    
+    if (ffp->aout){
+        SDL_AoutSetStereoVolume(ffp->aout, volume, volume);
+        return;
+    }
+ 
+//    SDL_UnlockMutex(ffp->is->play_mutex);
+}
+
 static int packet_queue_put_private(PacketQueue *q, AVPacket *pkt)
 {
     MyAVPacketList *pkt1;
@@ -810,6 +827,8 @@ static void toggle_pause_l(FFPlayer *ffp, int pause_on)
     ffp->auto_start = !pause_on;
     stream_update_pause_l(ffp);
     is->step = 0;
+    SDL_AoutSetStereoVolume(ffp->aout,ffp->audioVolume,ffp->audioVolume);
+
 }
 
 static void toggle_pause(FFPlayer *ffp, int pause_on)
@@ -977,8 +996,10 @@ display:
             SDL_LockMutex(ffp->is->play_mutex);
             if (is->step) {
                 is->step = 0;
+                SDL_AoutSetStereoVolume(ffp->aout,ffp->audioVolume,ffp->audioVolume);
                 if (!is->paused)
                     stream_update_pause_l(ffp);
+                
             }
             SDL_UnlockMutex(ffp->is->play_mutex);
         }
@@ -1889,7 +1910,7 @@ static int audio_open(FFPlayer *opaque, int64_t wanted_channel_layout, int wante
             return -1;
         }
     }
-
+    SDL_AoutSetStereoVolume(ffp->aout,ffp->audioVolume,ffp->audioVolume);
     audio_hw_params->fmt = AV_SAMPLE_FMT_S16;
     audio_hw_params->freq = spec.freq;
     audio_hw_params->channel_layout = wanted_channel_layout;
@@ -2463,8 +2484,12 @@ static int read_thread(void *arg)
                 ffp->auto_start = 0;
                 stream_update_pause_l(ffp);
             }
-//            if (is->pause_req)
-//                step_to_next_frame_l(ffp);
+            if (is->paused){
+                step_to_next_frame_l(ffp);
+                SDL_AoutSetStereoVolume(ffp->aout,0,0);
+            }
+            
+
             SDL_UnlockMutex(ffp->is->play_mutex);
             ffp_notify_msg1(ffp, FFP_MSG_SEEK_COMPLETE);
             ffp_toggle_buffering(ffp, 1);

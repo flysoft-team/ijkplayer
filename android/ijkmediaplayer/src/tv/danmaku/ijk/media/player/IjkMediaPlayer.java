@@ -436,7 +436,7 @@ public final class IjkMediaPlayer extends SimpleMediaPlayer {
 
     private native void _reset();
 
-    public native void setVolume(float leftVolume, float rightVolume);
+    public native void setVolume(float volume);
 
 	@Override
 	public native void setLooping(boolean looping);
