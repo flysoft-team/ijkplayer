@@ -826,7 +826,10 @@ static void toggle_pause_l(FFPlayer *ffp, int pause_on)
     is->pause_req = pause_on;
     ffp->auto_start = !pause_on;
     stream_update_pause_l(ffp);
-    is->step = 0;
+    if (is->step){
+        ffp_notify_msg1(ffp, FFP_MSG_SEEK_COMPLETE);
+        is->step = 0;
+    }
     SDL_AoutSetStereoVolume(ffp->aout,ffp->audioVolume,ffp->audioVolume);
 
 }
@@ -996,6 +999,7 @@ display:
             SDL_LockMutex(ffp->is->play_mutex);
             if (is->step) {
                 is->step = 0;
+                ffp_notify_msg1(ffp, FFP_MSG_SEEK_COMPLETE);
                 SDL_AoutSetStereoVolume(ffp->aout,ffp->audioVolume,ffp->audioVolume);
                 if (!is->paused)
                     stream_update_pause_l(ffp);
@@ -2488,10 +2492,13 @@ static int read_thread(void *arg)
                 step_to_next_frame_l(ffp);
                 SDL_AoutSetStereoVolume(ffp->aout,0,0);
             }
+            else {
+                ffp_notify_msg1(ffp, FFP_MSG_SEEK_COMPLETE);
+            }
             
 
             SDL_UnlockMutex(ffp->is->play_mutex);
-            ffp_notify_msg1(ffp, FFP_MSG_SEEK_COMPLETE);
+            
             ffp_toggle_buffering(ffp, 1);
         }
         if (is->queue_attachments_req) {
