@@ -31,7 +31,6 @@ obj/
 local.properties
 
 # Android Studio
-.iml
 .idea
 .gradle
 build/
