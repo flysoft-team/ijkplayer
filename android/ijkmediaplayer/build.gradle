@@ -1,9 +1,5 @@
 apply plugin: 'com.android.library'
 
-dependencies {
-	compile fileTree(dir: 'libs', include: '*.jar')
-}
-
 android {
 	//noinspection GroovyAssignabilityCheck
 	compileSdkVersion rootProject.ext.compileSdkVersion
