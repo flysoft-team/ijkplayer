@@ -424,6 +424,19 @@ IjkMediaPlayer_setFrameDrop(JNIEnv *env, jobject thiz, jint frameDrop)
 }
 
 static void
+IjkMediaPlayer_setMaxFps(JNIEnv *env, jobject thiz, jint maxFps)
+{
+    MPTRACE("IjkMediaPlayer_setMaxFps");
+    IjkMediaPlayer *mp = jni_get_media_player(env, thiz);
+    JNI_CHECK_GOTO(mp, env, "java/lang/IllegalStateException", "mpjni: setFrameDrop: null mp", LABEL_RETURN);
+    
+    ijkmp_set_max_fps(mp, maxFps);
+    
+LABEL_RETURN:
+    ijkmp_dec_ref_p(&mp);
+}
+
+static void
 IjkMediaPlayer_setMediaCodecEnabled(JNIEnv *env, jobject thiz, jboolean enabled)
 {
     MPTRACE("%s", __func__);
@@ -924,6 +937,7 @@ static JNINativeMethod g_methods[] = {
     { "_setSwScaleOption", "(Ljava/lang/String;Ljava/lang/String;)V", (void *) IjkMediaPlayer_setSwScaleOption },
     { "_setOverlayFormat", "(I)V", (void *) IjkMediaPlayer_setOverlayFormat },
     { "_setFrameDrop", "(I)V", (void *) IjkMediaPlayer_setFrameDrop },
+    { "_setMaxFps", "(I)V", (void *) IjkMediaPlayer_setMaxFps },
     { "_setMediaCodecEnabled", "(Z)V", (void *) IjkMediaPlayer_setMediaCodecEnabled },
     { "_setOpenSLESEnabled", "(Z)V", (void *) IjkMediaPlayer_setOpenSLESEnabled },
     { "_setAutoPlayOnPrepared", "(Z)V", (void *) IjkMediaPlayer_setAutoPlayOnPrepared },

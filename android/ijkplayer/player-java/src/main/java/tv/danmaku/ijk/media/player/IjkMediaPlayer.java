@@ -17,15 +17,6 @@
 
 package tv.danmaku.ijk.media.player;
 
-import java.io.IOException;
-import java.lang.ref.WeakReference;
-import java.util.ArrayList;
-import java.util.Locale;
-
-import tv.danmaku.ijk.media.player.annotations.AccessedByNative;
-import tv.danmaku.ijk.media.player.annotations.CalledByNative;
-import tv.danmaku.ijk.media.player.option.AvFormatOption;
-import tv.danmaku.ijk.media.player.pragma.DebugLog;
 import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
 import android.content.Context;
@@ -42,6 +33,16 @@ import android.text.TextUtils;
 import android.util.Log;
 import android.view.Surface;
 import android.view.SurfaceHolder;
+
+import java.io.IOException;
+import java.lang.ref.WeakReference;
+import java.util.ArrayList;
+import java.util.Locale;
+
+import tv.danmaku.ijk.media.player.annotations.AccessedByNative;
+import tv.danmaku.ijk.media.player.annotations.CalledByNative;
+import tv.danmaku.ijk.media.player.option.AvFormatOption;
+import tv.danmaku.ijk.media.player.pragma.DebugLog;
 
 /**
  * @author bbcallen
@@ -515,6 +516,10 @@ public final class IjkMediaPlayer extends SimpleMediaPlayer {
         _setFrameDrop(frameDrop);
     }
 
+	public void setMaxFps(int maxFps) {
+		_setMaxFps(maxFps);
+	}
+
     public void setMediaCodecEnabled(boolean enabled) {
         _setMediaCodecEnabled(enabled);
     }
@@ -532,6 +537,7 @@ public final class IjkMediaPlayer extends SimpleMediaPlayer {
     private native void _setSwScaleOption(String name, String value);
     private native void _setOverlayFormat(int chromaFourCC);
     private native void _setFrameDrop(int frameDrop);
+    private native void _setMaxFps(int maxFps);
     private native void _setMediaCodecEnabled(boolean enabled);
     private native void _setOpenSLESEnabled(boolean enabled);
     private native void _setAutoPlayOnPrepared(boolean enabled);
