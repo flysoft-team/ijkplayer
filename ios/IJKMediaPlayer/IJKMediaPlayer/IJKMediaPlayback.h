@@ -38,6 +38,7 @@
 - (void)stop;
 - (BOOL)isPlaying;
 - (void)shutdown;
+- (void)setPauseInBackground:(BOOL)pause;
 
 @property(nonatomic, readonly)  UIView *view;
 @property(nonatomic)            NSTimeInterval currentPlaybackTime;
@@ -51,11 +52,15 @@
 
 @property(nonatomic, readonly) int64_t numberOfBytesTransferred;
 
-- (UIImage *)thumbnailImageAtCurrentTime;
-
 @property(nonatomic) MPMovieControlStyle controlStyle;
 @property(nonatomic) MPMovieScalingMode scalingMode;
 @property(nonatomic) BOOL shouldAutoplay;
+
+@property (nonatomic) BOOL allowsMediaAirPlay;
+@property (nonatomic) BOOL isDanmakuMediaAirPlay;
+@property (nonatomic, readonly) BOOL airPlayMediaActive;
+
+- (UIImage *)thumbnailImageAtCurrentTime;
 
 #pragma mark Notifications
 
@@ -71,6 +76,8 @@ IJK_EXTERN NSString *const IJKMoviePlayerLoadStateDidChangeNotification;
 IJK_EXTERN NSString *const IJKMoviePlayerPlaybackDidFinishNotification;
 IJK_EXTERN NSString *const IJKMoviePlayerPlaybackStateDidChangeNotification;
 
+IJK_EXTERN NSString *const IJKMoviePlayerIsAirPlayVideoActiveDidChangeNotification;
+IJK_EXTERN NSString *const IJKMoviePlayerVideoDecoderOpenNotification;
 @end
 
 #pragma mark IJKMediaResource

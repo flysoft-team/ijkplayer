@@ -7,9 +7,6 @@ ios/ffmpeg-*
 ios/openssl-*
 extra
 .DS_Store
-android/ijkmediaplayer/.settings/*
-android/ijkmediaplayer-x86/.settings/*
-android/ijkmediawidget/.settings/*
 ijkmedia/ijkyuv/
 
 # built application files

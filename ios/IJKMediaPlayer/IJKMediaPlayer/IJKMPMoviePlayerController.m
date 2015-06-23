@@ -23,9 +23,6 @@
 #import "IJKMPMoviePlayerController.h"
 #import "IJKAudioKit.h"
 
-@interface IJKMPMoviePlayerController() <IJKAudioSessionDelegate>
-@end
-
 @implementation IJKMPMoviePlayerController
 
 @dynamic view;
@@ -41,6 +38,8 @@
 @dynamic controlStyle;
 @dynamic scalingMode;
 @dynamic shouldAutoplay;
+@synthesize isDanmakuMediaAirPlay = _isDanmakuMediaAirPlay;
+
 @synthesize numberOfBytesTransferred = _numberOfBytesTransferred;
 
 - (id)initWithContentURL:(NSURL *)aUrl
@@ -50,12 +49,11 @@
         self.controlStyle = MPMovieControlStyleNone;
         self.scalingMode = MPMovieScalingModeAspectFit;
         self.shouldAutoplay = YES;
-
         [self IJK_installMovieNotificationObservers];
-
+        
         self.useApplicationAudioSession = YES;
-        [[IJKAudioKit sharedInstance] setupAudioSession:self];
-
+        [[IJKAudioKit sharedInstance] setupAudioSession];
+        
         _bufferingProgress = -1;
     }
     return self;
@@ -71,10 +69,10 @@
     else {
         url = [NSURL URLWithString:aUrl];
     }
-
+    
     self = [self initWithContentURL:url];
     if (self) {
-
+        
     }
     return self;
 }
@@ -87,12 +85,11 @@
 - (BOOL)isPlaying
 {
     switch (self.playbackState) {
-    case MPMoviePlaybackStatePlaying:
-        return YES;
-    default:
-        return NO;
+        case MPMoviePlaybackStatePlaying:
+            return YES;
+        default:
+            return NO;
     }
-   
 }
 
 - (void)shutdown
@@ -115,39 +112,77 @@
     return [super thumbnailImageAtTime:self.currentPlaybackTime timeOption:MPMovieTimeOptionExact];
 }
 
+-(BOOL)allowsMediaAirPlay
+{
+    if (!self)
+        return NO;
+    return [self allowsAirPlay];
+}
+
+-(void)setAllowsMediaAirPlay:(BOOL)b
+{
+    if (!self)
+        return;
+    [self setAllowsAirPlay:b];
+}
+
+-(BOOL)airPlayMediaActive
+{
+    if (!self)
+        return NO;
+    
+    return self.airPlayVideoActive || self.isDanmakuMediaAirPlay;
+}
+
+-(BOOL)isDanmakuMediaAirPlay
+{
+    return _isDanmakuMediaAirPlay;
+}
+
+-(void)setIsDanmakuMediaAirPlay:(BOOL)isDanmakuMediaAirPlay
+{
+    _isDanmakuMediaAirPlay = isDanmakuMediaAirPlay;
+    [[NSNotificationCenter defaultCenter] postNotificationName:IJKMoviePlayerIsAirPlayVideoActiveDidChangeNotification object:nil userInfo:nil];
+}
+
 #pragma mark Movie Notification Handlers
 
 /* Register observers for the various movie object notifications. */
 -(void)IJK_installMovieNotificationObservers
 {
-	[[NSNotificationCenter defaultCenter] addObserver:self
+    [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(IJK_dispatchMPMediaPlaybackIsPreparedToPlayDidChangeNotification:)
                                                  name:MPMediaPlaybackIsPreparedToPlayDidChangeNotification
                                                object:self];
-
-	[[NSNotificationCenter defaultCenter] addObserver:self
+    
+    [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(IJK_dispatchMPMoviePlayerLoadStateDidChangeNotification:)
                                                  name:MPMoviePlayerLoadStateDidChangeNotification
                                                object:self];
-
-	[[NSNotificationCenter defaultCenter] addObserver:self
+    
+    [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(IJK_dispatchMPMoviePlayerPlaybackDidFinishNotification:)
                                                  name:MPMoviePlayerPlaybackDidFinishNotification
                                                object:self];
-
-	[[NSNotificationCenter defaultCenter] addObserver:self
+    
+    [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(IJK_dispatchMPMoviePlayerPlaybackStateDidChangeNotification:)
                                                  name:MPMoviePlayerPlaybackStateDidChangeNotification
+                                               object:self];
+    
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(IJK_dispatchMoviePlayerIsAirPlayVideoActiveDidChangeNotification:)
+                                                 name:MPMoviePlayerIsAirPlayVideoActiveDidChangeNotification
                                                object:self];
 }
 
 - (void)IJK_removeMovieNotificationObservers
 {
     [[NSNotificationCenter defaultCenter]removeObserver:self name:MPMediaPlaybackIsPreparedToPlayDidChangeNotification object:self];
-
     [[NSNotificationCenter defaultCenter]removeObserver:self name:MPMoviePlayerLoadStateDidChangeNotification object:self];
     [[NSNotificationCenter defaultCenter]removeObserver:self name:MPMoviePlayerPlaybackDidFinishNotification object:self];
     [[NSNotificationCenter defaultCenter]removeObserver:self name:MPMoviePlayerPlaybackStateDidChangeNotification object:self];
+    [[NSNotificationCenter defaultCenter]removeObserver:self name:MPMoviePlayerIsAirPlayVideoActiveDidChangeNotification object:self];
 }
 
 - (void)IJK_dispatchMPMediaPlaybackIsPreparedToPlayDidChangeNotification:(NSNotification*)notification
@@ -170,16 +205,14 @@
     [[NSNotificationCenter defaultCenter] postNotificationName:IJKMoviePlayerPlaybackStateDidChangeNotification object:notification.object userInfo:notification.userInfo];
 }
 
-#pragma mark IJKAudioSessionDelegate
-
-- (void)ijkAudioBeginInterruption
+- (void)IJK_dispatchMoviePlayerIsAirPlayVideoActiveDidChangeNotification:(NSNotification*)notification
 {
-    [self pause];
+    [[NSNotificationCenter defaultCenter] postNotificationName:IJKMoviePlayerIsAirPlayVideoActiveDidChangeNotification object:notification.object userInfo:notification.userInfo];
 }
 
-- (void)ijkAudioEndInterruption
+- (void)setPauseInBackground:(BOOL)pause
 {
-    [self pause];
+    //mpPlayer还未找到方法实现
 }
 
 @end

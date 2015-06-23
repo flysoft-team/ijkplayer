@@ -32,6 +32,7 @@
 #include "libavcodec/avfft.h"
 #include "libswscale/swscale.h"
 #include "libavutil/base64.h"
+#include "libavutil/error.h"
 #include "libavutil/opt.h"
 #include "libswresample/swresample.h"
 
@@ -39,5 +40,10 @@
 #include "ijkutil/ijkutil.h"
 
 typedef int (*ijk_format_control_message)(void *opaque, int type, void *data, size_t data_size);
+
+#define FFP_OPT_CATEGORY_FORMAT 1
+#define FFP_OPT_CATEGORY_CODEC  2
+#define FFP_OPT_CATEGORY_SWS    3
+#define FFP_OPT_CATEGORY_PLAYER 4
 
 #endif
