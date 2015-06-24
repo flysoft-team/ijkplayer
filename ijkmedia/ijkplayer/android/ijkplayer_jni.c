@@ -428,7 +428,7 @@ IjkMediaPlayer_setMaxFps(JNIEnv *env, jobject thiz, jint maxFps)
 {
     MPTRACE("IjkMediaPlayer_setMaxFps");
     IjkMediaPlayer *mp = jni_get_media_player(env, thiz);
-    JNI_CHECK_GOTO(mp, env, "java/lang/IllegalStateException", "mpjni: setFrameDrop: null mp", LABEL_RETURN);
+    JNI_CHECK_GOTO(mp, env, "java/lang/IllegalStateException", "mpjni: setMaxFps: null mp", LABEL_RETURN);
     
     ijkmp_set_max_fps(mp, maxFps);
     
