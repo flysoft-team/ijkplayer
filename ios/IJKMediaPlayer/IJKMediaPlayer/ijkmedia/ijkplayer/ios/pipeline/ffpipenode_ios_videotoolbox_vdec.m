@@ -28,8 +28,9 @@
 #include "ijkplayer/ff_ffplay.h"
 #include "ijksdl_mutex.h"
 #include "ijksdl_vout_ios_gles2.h"
+#import <UIKit/UIKit.h>
 
-typedef struct IJKFF_Pipenode_Opaque {
+struct IJKFF_Pipenode_Opaque {
     IJKFF_Pipeline           *pipeline;
     FFPlayer                 *ffp;
     Decoder                  *decoder;
@@ -37,7 +38,7 @@ typedef struct IJKFF_Pipenode_Opaque {
     AVCodecContext           *avctx; // not own
     SDL_Thread*              video_fill_thread;
     SDL_Thread              _video_fill_thread;
-} IJKFF_Pipenode_Opaque;
+};
 
 
 
@@ -65,7 +66,6 @@ int decoder_decode_frame_videotoolbox(VideoToolBoxContext* context) {
                     context->refresh_request = true;
                     context->serial += 1;
                     d->finished = 0;
-                   // context->last_keyframe_pts = d->pkt.pts;
                      ALOGI("flushed last keyframe pts %lld \n",d->pkt.pts);
                     d->next_pts = d->start_pts;
                     d->next_pts_tb = d->start_pts_tb;
@@ -134,21 +134,21 @@ the_end:
 
 static void func_destroy(IJKFF_Pipenode *node)
 {
-    ALOGI("pipeline!!! destory!!!!!\n %d", (int)node);
-    if (!node || !node->opaque)
-        return;
-    IJKFF_Pipenode_Opaque *opaque = node->opaque;
-    if (opaque->context) {
-        dealloc_videotoolbox(opaque->context);
-        free(opaque->context);
-        opaque->context = NULL;
-    }
+    // do nothing
 }
 
 static int func_run_sync(IJKFF_Pipenode *node)
 {
     IJKFF_Pipenode_Opaque *opaque = node->opaque;
-    return videotoolbox_video_thread(opaque);
+    int ret = videotoolbox_video_thread(opaque);
+
+    if (opaque->context) {
+        dealloc_videotoolbox(opaque->context);
+        free(opaque->context);
+        opaque->context = NULL;
+    }
+
+    return ret;
 }
 
 

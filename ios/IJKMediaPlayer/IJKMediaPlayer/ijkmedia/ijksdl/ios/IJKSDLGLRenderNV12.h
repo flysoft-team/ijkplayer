@@ -20,9 +20,11 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#import <Foundation/Foundation.h>
+#import <CoreVideo/CoreVideo.h>
 #import "IJKSDLGLRender.h"
 
 @interface IJKSDLGLRenderNV12 : NSObject<IJKSDLGLRender>
+
+-(id)initWithTextureCache:(CVOpenGLESTextureCacheRef) textureCache;
 
 @end

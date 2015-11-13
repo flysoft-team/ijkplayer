@@ -15,10 +15,10 @@
  */
 
 #import <UIKit/UIKit.h>
-#import <IJKMediaPlayer/IJKMediaPlayer.h>
+#import <IJKMediaFramework/IJKMediaFramework.h>
 @class IJKMediaControl;
 
-@interface IJKVideoViewController : UIViewController
+@interface IJKVideoViewController : UIViewController <IJKMediaHttpOpenDelegate, IJKMediaTcpOpenDelegate>
 
 @property(atomic,strong) NSURL *url;
 @property(atomic, retain) id<IJKMediaPlayback> player;
@@ -32,6 +32,12 @@
 - (IBAction)onClickBack:(id)sender;
 - (IBAction)onClickPlay:(id)sender;
 - (IBAction)onClickPause:(id)sender;
+
+- (IBAction)didSliderTouchDown;
+- (IBAction)didSliderTouchCancel;
+- (IBAction)didSliderTouchUpOutside;
+- (IBAction)didSliderTouchUpInside;
+- (IBAction)didSliderValueChanged;
 
 @property(nonatomic,strong) IBOutlet IJKMediaControl *mediaControl;
 

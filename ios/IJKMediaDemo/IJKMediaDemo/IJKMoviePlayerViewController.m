@@ -17,7 +17,6 @@
 #import "IJKMoviePlayerViewController.h"
 #import "IJKMediaControl.h"
 #import "IJKCommon.h"
-#import "IJKMediaPlayer/IJKMediaPlayer.h"
 #import "IJKDemoHistory.h"
 
 @implementation IJKVideoViewController
@@ -53,6 +52,7 @@
     return self;
 }
 
+#define EXPECTED_IJKPLAYER_VERSION (1 << 16) & 0xFF) | 
 - (void)viewDidLoad
 {
     [super viewDidLoad];
@@ -61,11 +61,28 @@
 //    [[UIApplication sharedApplication] setStatusBarHidden:YES];
 //    [[UIApplication sharedApplication] setStatusBarOrientation:UIInterfaceOrientationLandscapeLeft animated:NO];
 
+#ifdef DEBUG
     [IJKFFMoviePlayerController setLogReport:YES];
-    self.player = [[IJKFFMoviePlayerController alloc] initWithContentURL:self.url withOptions:nil];
+    [IJKFFMoviePlayerController setLogLevel:k_IJK_LOG_DEBUG];
+#else
+    [IJKFFMoviePlayerController setLogReport:NO];
+    [IJKFFMoviePlayerController setLogLevel:k_IJK_LOG_INFO];
+#endif
+
+    [IJKFFMoviePlayerController checkIfFFmpegVersionMatch:YES];
+    // [IJKFFMoviePlayerController checkIfPlayerVersionMatch:YES major:1 minor:0 micro:0];
+
+    IJKFFOptions *options = [IJKFFOptions optionsByDefault];
+    [options setFormatOptionValue:@"ijktcphook" forKey:@"http-tcp-hook"];
+
+    self.player = [[IJKFFMoviePlayerController alloc] initWithContentURL:self.url withOptions:options];
     self.player.view.autoresizingMask = UIViewAutoresizingFlexibleWidth|UIViewAutoresizingFlexibleHeight;
     self.player.view.frame = self.view.bounds;
     self.player.scalingMode = MPMovieScalingModeAspectFit;
+    self.player.shouldAutoplay = YES;
+
+    IJKFFMoviePlayerController *ffp = self.player;
+    ffp.httpOpenDelegate = self;
 
     self.view.autoresizesSubviews = YES;
     [self.view addSubview:self.player.view];
@@ -74,13 +91,22 @@
     self.mediaControl.delegatePlayer = self.player;
 }
 
+- (NSString *)onHttpOpen:(int)streamIndex url:(NSString *)url
+{
+    return url;
+}
+
+- (NSString *)onTcpOpen:(int)streamIndex url:(NSString *)url
+{
+    return url;
+}
+
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
     
     [self installMovieNotificationObservers];
 
     [self.player prepareToPlay];
-    [self.player play];
 }
 
 - (void)viewDidDisappear:(BOOL)animated {
@@ -94,13 +120,9 @@
     return UIInterfaceOrientationIsLandscape(toInterfaceOrientation);
 }
 
-- (NSUInteger)supportedInterfaceOrientations
+- (UIInterfaceOrientationMask)supportedInterfaceOrientations
 {
     return UIInterfaceOrientationMaskLandscape;
-}
-
-- (UIInterfaceOrientation)preferredInterfaceOrientationForPresentation{
-    return UIInterfaceOrientationLandscapeLeft;
 }
 
 - (void)didReceiveMemoryWarning
@@ -138,6 +160,32 @@
 {
     [self.player pause];
     [self.mediaControl refreshMediaControl];
+}
+
+- (IBAction)didSliderTouchDown
+{
+    [self.mediaControl beginDragMediaSlider];
+}
+
+- (IBAction)didSliderTouchCancel
+{
+    [self.mediaControl endDragMediaSlider];
+}
+
+- (IBAction)didSliderTouchUpOutside
+{
+    [self.mediaControl endDragMediaSlider];
+}
+
+- (IBAction)didSliderTouchUpInside
+{
+    self.player.currentPlaybackTime = self.mediaControl.mediaProgressSlider.value;
+    [self.mediaControl endDragMediaSlider];
+}
+
+- (IBAction)didSliderValueChanged
+{
+    [self.mediaControl continueDragMediaSlider];
 }
 
 - (void)loadStateDidChange:(NSNotification*)notification

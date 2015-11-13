@@ -24,30 +24,30 @@
 
 @implementation IJKMediaUtils
 
-+ (NSString*)createTempFileNameForFFConcat
++ (int)createTempFDForFFConcat
 {
-    return [IJKMediaUtils createTempFileNameWithPrefix:@"ffconcat-"];
+    return [IJKMediaUtils createTempFDWithPrefix:@"ffconcat-"];
 }
 
-+ (NSString*)createTempFileNameWithPrefix: (NSString*)aPrefix
++ (int)createTempFDWithPrefix: (NSString*)aPrefix
 {
-    return [IJKMediaUtils createTempFileNameInDirectory: NSTemporaryDirectory()
-                                             withPrefix: aPrefix];
+    return [IJKMediaUtils createTempFDInDirectory: NSTemporaryDirectory()
+                                       withPrefix: aPrefix];
 }
 
-+ (NSString*)createTempFileNameInDirectory: (NSString*)aDirectory
-                                withPrefix: (NSString*)aPrefix
++ (int)createTempFDInDirectory: (NSString*)aDirectory
+                    withPrefix: (NSString*)aPrefix
 {
-    NSString* templateStr = [NSString stringWithFormat:@"%@/%@XXXXX", aDirectory, aPrefix];
-    char template[templateStr.length + 1];
+    NSString* templateStr = [NSString stringWithFormat:@"%@/%@XXXXXX", aDirectory, aPrefix];
+    char template[templateStr.length + 32];
     strcpy(template, [templateStr cStringUsingEncoding:NSASCIIStringEncoding]);
-    char* filename = mktemp(template);
-
-    if (filename == NULL) {
-        NSLog(@"Could not create file in directory %@", aDirectory);
-        return nil;
+    int fd = mkstemp(template);
+    if (fd <= 0) {
+        NSLog(@"Could not create fd in directory %@", aDirectory);
+        return -1;
     }
-    return [NSString stringWithCString:filename encoding:NSASCIIStringEncoding];
+    unlink(template);
+    return fd;
 }
 
 + (NSError*)createErrorWithDomain: (NSString*)domain

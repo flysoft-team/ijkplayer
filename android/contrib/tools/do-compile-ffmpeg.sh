@@ -25,9 +25,17 @@ echo "[*] check env $1"
 echo "===================="
 set -e
 
+UNAME_S=$(uname -s)
+UNAME_SM=$(uname -sm)
+echo "build on $UNAME_SM"
+
+echo "ANDROID_SDK=$ANDROID_SDK"
+echo "ANDROID_NDK=$ANDROID_NDK"
+
 if [ -z "$ANDROID_NDK" -o -z "$ANDROID_SDK" ]; then
     echo "You must define ANDROID_NDK, ANDROID_SDK before starting."
-    echo "They must point to your NDK and SDK directories.\n"
+    echo "They must point to your NDK and SDK directories."
+    echo ""
     exit 1
 fi
 
@@ -35,7 +43,8 @@ fi
 # common defines
 FF_ARCH=$1
 if [ -z "$FF_ARCH" ]; then
-    echo "You must specific an architecture 'arm, armv7a, x86, ...'.\n"
+    echo "You must specific an architecture 'arm, armv7a, x86, ...'."
+    echo ""
     exit 1
 fi
 
@@ -65,7 +74,6 @@ FF_GCC_VER=4.8
 FF_GCC_64_VER=4.9
 
 
-
 FF_BUILD_NAME=
 FF_SOURCE=
 FF_CROSS_PREFIX=
@@ -78,6 +86,27 @@ FF_EXTRA_CFLAGS=
 FF_EXTRA_LDFLAGS=
 FF_DEP_LIBS=
 FF_ASM_OBJ_DIR=
+
+#--------------------
+echo ""
+echo "--------------------"
+echo "[*] make NDK standalone toolchain"
+echo "--------------------"
+FF_MAKE_TOOLCHAIN_FLAGS=
+case "$UNAME_S" in
+    Darwin)
+        FF_MAKE_TOOLCHAIN_FLAGS="$FF_MAKE_TOOLCHAIN_FLAGS --system=darwin-x86_64"
+    ;;
+    CYGWIN_NT-*)
+        FF_MAKE_TOOLCHAIN_FLAGS="$FF_MAKE_TOOLCHAIN_FLAGS --system=windows-x86_64"
+
+        FF_WIN_TEMP="$(cygpath -am /tmp)"
+        export TEMPDIR=$FF_WIN_TEMP/
+
+        echo "Cygwin temp prefix=$FF_WIN_TEMP/"
+        #FF_CFG_FLAGS="$FF_CFG_FLAGS --tempprefix=$FF_WIN_TEMP/"
+    ;;
+esac
 
 #----- armv7a begin -----
 if [ "$FF_ARCH" = "armv7a" ]; then
@@ -95,7 +124,7 @@ if [ "$FF_ARCH" = "armv7a" ]; then
     FF_EXTRA_CFLAGS="$FF_EXTRA_CFLAGS -march=armv7-a -mcpu=cortex-a8 -mfpu=vfpv3-d16 -mfloat-abi=softfp -mthumb"
     FF_EXTRA_LDFLAGS="$FF_EXTRA_LDFLAGS -Wl,--fix-cortex-a8"
 
-    FF_ASM_OBJ_DIR="libavutil/arm/*.o libavcodec/arm/*.o libswresample/arm/*.o"
+    FF_ASM_OBJ_DIR="libavcodec/arm/*.o libavutil/arm/*.o libswresample/arm/*.o"
 
 elif [ "$FF_ARCH" = "armv5" ]; then
     FF_BUILD_NAME=ffmpeg-armv5
@@ -110,7 +139,7 @@ elif [ "$FF_ARCH" = "armv5" ]; then
     FF_EXTRA_CFLAGS="$FF_EXTRA_CFLAGS -march=armv5te -mtune=arm9tdmi -msoft-float"
     FF_EXTRA_LDFLAGS="$FF_EXTRA_LDFLAGS"
 
-    FF_ASM_OBJ_DIR="libavutil/arm/*.o libavcodec/arm/*.o libswresample/arm/*.o"
+    FF_ASM_OBJ_DIR="libavcodec/arm/*.o libavutil/arm/*.o libswresample/arm/*.o"
 
 elif [ "$FF_ARCH" = "x86" ]; then
     FF_BUILD_NAME=ffmpeg-x86
@@ -125,7 +154,7 @@ elif [ "$FF_ARCH" = "x86" ]; then
     FF_EXTRA_CFLAGS="$FF_EXTRA_CFLAGS -march=atom -msse3 -ffast-math -mfpmath=sse"
     FF_EXTRA_LDFLAGS="$FF_EXTRA_LDFLAGS"
 
-    FF_ASM_OBJ_DIR="libavutil/x86/*.o libavcodec/x86/*.o libswresample/x86/*.o libswscale/x86/*.o"
+    FF_ASM_OBJ_DIR="libavcodec/x86/*.o libavfilter/x86/*.o libavutil/x86/*.o libswresample/x86/*.o libswscale/x86/*.o"
 
 elif [ "$FF_ARCH" = "arm64" ]; then
     FF_ANDROID_PLATFORM=android-21
@@ -142,7 +171,7 @@ elif [ "$FF_ARCH" = "arm64" ]; then
     FF_EXTRA_CFLAGS="$FF_EXTRA_CFLAGS"
     FF_EXTRA_LDFLAGS="$FF_EXTRA_LDFLAGS"
 
-    FF_ASM_OBJ_DIR="libavutil/aarch64/*.o libavcodec/aarch64/*.o libswresample/aarch64/*.o libavcodec/neon/*.o"
+    FF_ASM_OBJ_DIR="libavcodec/aarch64/*.o libavutil/aarch64/*.o libswresample/aarch64/*.o libavcodec/neon/*.o"
 
 else
     echo "unknown architecture $FF_ARCH";
@@ -150,27 +179,22 @@ else
 fi
 
 FF_TOOLCHAIN_PATH=$FF_BUILD_ROOT/build/$FF_BUILD_NAME/toolchain
+FF_MAKE_TOOLCHAIN_FLAGS="$FF_MAKE_TOOLCHAIN_FLAGS --install-dir=$FF_TOOLCHAIN_PATH"
 
 FF_SYSROOT=$FF_TOOLCHAIN_PATH/sysroot
 FF_PREFIX=$FF_BUILD_ROOT/build/$FF_BUILD_NAME/output
 FF_DEP_OPENSSL_INC=$FF_BUILD_ROOT/build/$FF_BUILD_NAME_OPENSSL/output/include
 FF_DEP_OPENSSL_LIB=$FF_BUILD_ROOT/build/$FF_BUILD_NAME_OPENSSL/output/lib
 
+case "$UNAME_S" in
+    CYGWIN_NT-*)
+        FF_SYSROOT="$(cygpath -am $FF_SYSROOT)"
+        FF_PREFIX="$(cygpath -am $FF_PREFIX)"
+    ;;
+esac
+
 mkdir -p $FF_PREFIX
 mkdir -p $FF_SYSROOT
-
-#--------------------
-echo "\n--------------------"
-echo "[*] make NDK standalone toolchain"
-echo "--------------------"
-UNAMES=$(uname -s)
-UNAMESM=$(uname -sm)
-echo "build on $UNAMESM"
-FF_MAKE_TOOLCHAIN_FLAGS="--install-dir=$FF_TOOLCHAIN_PATH"
-if [ "$UNAMES" = "Darwin" ]; then
-    FF_MAKE_TOOLCHAIN_FLAGS="$FF_MAKE_TOOLCHAIN_FLAGS --system=darwin-x86_64"
-    FF_MAKE_FLAG=-j`sysctl -n machdep.cpu.thread_count`
-fi
 
 FF_MAKEFLAGS=
 if which nproc >/dev/null
@@ -192,10 +216,11 @@ fi
 
 
 #--------------------
-echo "\n--------------------"
+echo ""
+echo "--------------------"
 echo "[*] check ffmpeg env"
 echo "--------------------"
-export PATH=$FF_TOOLCHAIN_PATH/bin:$PATH
+export PATH=$FF_TOOLCHAIN_PATH/bin/:$PATH
 #export CC="ccache ${FF_CROSS_PREFIX}-gcc"
 export CC="${FF_CROSS_PREFIX}-gcc"
 export LD=${FF_CROSS_PREFIX}-ld
@@ -251,13 +276,15 @@ FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-asm"
 FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-inline-asm"
 
 #--------------------
-echo "\n--------------------"
+echo ""
+echo "--------------------"
 echo "[*] configurate ffmpeg"
 echo "--------------------"
 cd $FF_SOURCE
 if [ -f "./config.h" ]; then
     echo 'reuse configure'
 else
+    which $CC
     ./configure $FF_CFG_FLAGS \
         --extra-cflags="$FF_CFLAGS $FF_EXTRA_CFLAGS" \
         --extra-ldflags="$FF_DEP_LIBS $FF_EXTRA_LDFLAGS"
@@ -265,24 +292,29 @@ else
 fi
 
 #--------------------
-echo "\n--------------------"
+echo ""
+echo "--------------------"
 echo "[*] compile ffmpeg"
 echo "--------------------"
 cp config.* $FF_PREFIX
 make $FF_MAKEFLAGS
 make install
+mkdir -p $FF_PREFIX/include/libffmpeg
+cp -f config.h $FF_PREFIX/include/libffmpeg/config.h
 
 #--------------------
-echo "\n--------------------"
+echo ""
+echo "--------------------"
 echo "[*] link ffmpeg"
 echo "--------------------"
 echo $FF_EXTRA_LDFLAGS
 $CC -lm -lz -shared --sysroot=$FF_SYSROOT -Wl,--no-undefined -Wl,-z,noexecstack $FF_EXTRA_LDFLAGS \
     -Wl,-soname,libijkffmpeg.so \
     compat/*.o \
-    libavutil/*.o \
     libavcodec/*.o \
+    libavfilter/*.o \
     libavformat/*.o \
+    libavutil/*.o \
     libswresample/*.o \
     libswscale/*.o \
     $FF_ASM_OBJ_DIR \
@@ -298,7 +330,8 @@ mysedi() {
     rm /tmp/$n
 }
 
-echo "\n--------------------"
+echo ""
+echo "--------------------"
 echo "[*] create files for shared ffmpeg"
 echo "--------------------"
 rm -rf $FF_PREFIX/shared
@@ -316,6 +349,7 @@ for f in $FF_PREFIX/lib/pkgconfig/*.pc; do
     # OSX sed doesn't have in-place(-i)
     mysedi $f 's/\/output/\/output\/shared/g'
     mysedi $f 's/-lavcodec/-lijkffmpeg/g'
+    mysedi $f 's/-lavfilter/-lijkffmpeg/g'
     mysedi $f 's/-lavformat/-lijkffmpeg/g'
     mysedi $f 's/-lavutil/-lijkffmpeg/g'
     mysedi $f 's/-lswresample/-lijkffmpeg/g'

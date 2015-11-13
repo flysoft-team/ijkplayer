@@ -33,8 +33,10 @@
     AudioQueueRef _audioQueueRef;
     AudioQueueBufferRef _audioQueueBufferRefArray[kIJKAudioQueueNumberBuffers];
     BOOL _isPaused;
+    BOOL _isStopped;
 
     volatile BOOL _isAborted;
+    NSLock *_lock;
 }
 
 - (id)initWithAudioSpec:(const SDL_AudioSpec *)aSpec
@@ -94,6 +96,10 @@
             return nil;
         }
          */
+
+        _isStopped = NO;
+
+        _lock = [[NSLock alloc] init];
     }
     return self;
 }
@@ -108,15 +114,17 @@
     if (!_audioQueueRef)
         return;
 
-    _isPaused = NO;
-    NSError *error = nil;
-    if (NO == [[AVAudioSession sharedInstance] setActive:YES error:&error]) {
-        NSLog(@"AudioQueue: AVAudioSession.setActive(YES) failed: %@\n", error ? [error localizedDescription] : @"nil");
-    }
+    @synchronized(_lock) {
+        _isPaused = NO;
+        NSError *error = nil;
+        if (NO == [[AVAudioSession sharedInstance] setActive:YES error:&error]) {
+            NSLog(@"AudioQueue: AVAudioSession.setActive(YES) failed: %@\n", error ? [error localizedDescription] : @"nil");
+        }
 
-    OSStatus status = AudioQueueStart(_audioQueueRef, NULL);
-    if (status != noErr)
-        NSLog(@"AudioQueue: AudioQueueStart failed (%d)\n", (int)status);
+        OSStatus status = AudioQueueStart(_audioQueueRef, NULL);
+        if (status != noErr)
+            NSLog(@"AudioQueue: AudioQueueStart failed (%d)\n", (int)status);
+    }
 }
 
 - (void)pause
@@ -124,10 +132,15 @@
     if (!_audioQueueRef)
         return;
 
-    _isPaused = YES;
-    OSStatus status = AudioQueuePause(_audioQueueRef);
-    if (status != noErr)
-        NSLog(@"AudioQueue: AudioQueuePause failed (%d)\n", (int)status);
+    @synchronized(_lock) {
+        if (_isStopped)
+            return;
+
+        _isPaused = YES;
+        OSStatus status = AudioQueuePause(_audioQueueRef);
+        if (status != noErr)
+            NSLog(@"AudioQueue: AudioQueuePause failed (%d)\n", (int)status);
+    }
 }
 
 - (void)flush
@@ -135,7 +148,12 @@
     if (!_audioQueueRef)
         return;
 
-    AudioQueueFlush(_audioQueueRef);
+    @synchronized(_lock) {
+        if (_isStopped)
+            return;
+
+        AudioQueueFlush(_audioQueueRef);
+    }
 }
 
 - (void)stop
@@ -143,18 +161,22 @@
     if (!_audioQueueRef)
         return;
 
-    AudioQueueStop(_audioQueueRef, false);
-    AudioQueueDispose(_audioQueueRef, false);
+    @synchronized(_lock) {
+        if (_isStopped)
+            return;
+
+        _isStopped = YES;
+    }
+
+    // do not lock AudioQueueStop, or may be run into deadlock
+    AudioQueueStop(_audioQueueRef, true);
+    AudioQueueDispose(_audioQueueRef, true);
 }
 
 - (void)close
 {
     [self stop];
-
-    if (!_audioQueueRef)
-        return;
-
-    _audioQueueRef = NULL;
+    _audioQueueRef = nil;
 }
 
 static void IJKSDLAudioQueueOuptutCallback(void * inUserData, AudioQueueRef inAQ, AudioQueueBufferRef inBuffer) {
@@ -163,7 +185,7 @@ static void IJKSDLAudioQueueOuptutCallback(void * inUserData, AudioQueueRef inAQ
 
         if (!aqController) {
             // do nothing;
-        } else if (aqController->_isPaused) {
+        } else if (aqController->_isPaused || aqController->_isStopped) {
             memset(inBuffer->mAudioData, aqController.spec.silence, inBuffer->mAudioDataByteSize);
         } else {
             (*aqController.spec.callback)(aqController.spec.userdata, inBuffer->mAudioData, inBuffer->mAudioDataByteSize);
