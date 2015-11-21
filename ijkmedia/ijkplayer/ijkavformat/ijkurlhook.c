@@ -32,9 +32,9 @@ typedef struct Context {
     AVClass        *class;
     URLContext     *inner;
 
-    char           *inner_url;
     int64_t         logical_pos;
     int64_t         logical_size;
+    int             io_error;
 
     IJKAVInject_OnUrlOpenData inject_data;
     const char     *scheme;
@@ -46,57 +46,88 @@ typedef struct Context {
     AVDictionary   *inner_options;
     int64_t         opaque;
     int             segment_index;
-#ifdef DEBUG
     int64_t         test_fail_point;
-#endif
+    int64_t         test_fail_point_next;
 } Context;
 
-static void *ijkinject_get_opaque(URLContext *h) {
-    Context *c = h->priv_data;
-#ifdef __GNUC__
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wint-to-pointer-cast"
-#endif
-    return (void *)c->opaque;
-#ifdef __GNUC__
-#pragma GCC diagnostic pop
-#endif
-}
-
-static int ijkurlhook_connect(URLContext *h)
+static int ijkurlhook_call_inject(URLContext *h)
 {
     Context *c = h->priv_data;
     IjkAVInjectCallback inject_callback = ijkav_get_inject_callback();
-    void *opaque = ijkinject_get_opaque(h);
+    void *opaque = (void *) (intptr_t) c->opaque;
     int ret = 0;
-    AVDictionary *inner_options = NULL;
+
+    if (ff_check_interrupt(&h->interrupt_callback)) {
+        ret = AVERROR_EXIT;
+        goto fail;
+    }
 
     if (opaque && inject_callback) {
-        av_log(h, AV_LOG_INFO, "url-hook %s\n", c->inject_data.url);
+        IJKAVInject_OnUrlOpenData inject_data_backup = c->inject_data;
+
+        c->inject_data.is_handled = 0;
+        c->inject_data.is_url_changed = 0;
         ret = inject_callback(opaque, c->open_callback_id, &c->inject_data, sizeof(c->inject_data));
         if (ret || !c->inject_data.url[0]) {
             ret = AVERROR_EXIT;
             goto fail;
         }
+
+        if (!c->inject_data.is_url_changed && strcmp(inject_data_backup.url, c->inject_data.url)) {
+            // force a url compare
+            c->inject_data.is_url_changed = 1;
+        }
+
+        av_log(h, AV_LOG_INFO, "%s %s (%s)\n", h->prot->name, c->inject_data.url, c->inject_data.is_url_changed ? "changed" : "remain");
     }
+
+    if (ff_check_interrupt(&h->interrupt_callback)) {
+        ret = AVERROR_EXIT;
+        goto fail;
+    }
+
+fail:
+    return ret;
+}
+
+static int ijkurlhook_reconnect(URLContext *h, AVDictionary *extra)
+{
+    Context *c = h->priv_data;
+    int ret = 0;
+    URLContext *new_url = NULL;
+    AVDictionary *inner_options = NULL;
+
+    c->test_fail_point_next += c->test_fail_point;
 
     assert(c->inner_options);
     av_dict_copy(&inner_options, c->inner_options, 0);
+    if (extra)
+        av_dict_copy(&inner_options, extra, 0);
 
-    ret = ffurl_open(&c->inner, c->inject_data.url, c->inner_flags, &h->interrupt_callback, &inner_options);
+    ret = ffurl_open(&new_url, c->inject_data.url, c->inner_flags, &h->interrupt_callback, &inner_options);
     if (ret)
         goto fail;
 
-    c->logical_size = ffurl_seek(c->inner, 0, AVSEEK_SIZE);
+    ffurl_closep(&c->inner);
+
+    c->inner        = new_url;
     h->is_streamed  = c->inner->is_streamed;
+    c->logical_pos  = ffurl_seek(c->inner, 0, SEEK_CUR);
+    if (c->inner->is_streamed)
+        c->logical_size = -1;
+    else
+        c->logical_size = ffurl_seek(c->inner, 0, AVSEEK_SIZE);
+
+    c->io_error = 0;
 fail:
     av_dict_free(&inner_options);
     return ret;
 }
 
-static int ijkurlhook_open(URLContext *h, const char *arg, int flags, AVDictionary **options)
+static int ijkurlhook_init(URLContext *h, const char *arg, int flags, AVDictionary **options)
 {
     Context *c = h->priv_data;
+    int ret = 0;
 
     av_strstart(arg, c->scheme, &arg);
 
@@ -109,34 +140,39 @@ static int ijkurlhook_open(URLContext *h, const char *arg, int flags, AVDictiona
 
     c->inject_data.size = sizeof(c->inject_data);
     c->inject_data.segment_index = c->segment_index;
-    strlcpy(c->inject_data.url, arg, sizeof(c->inject_data.url));
+    c->inject_data.retry_counter = 0;
 
     if (av_strstart(arg, c->inner_scheme, NULL)) {
-        snprintf(c->inject_data.url, sizeof(c->inject_data.url), "%s", c->inject_data.url);
+        snprintf(c->inject_data.url, sizeof(c->inject_data.url), "%s", arg);
     } else {
-        snprintf(c->inject_data.url, sizeof(c->inject_data.url), "%s%s", c->inner_scheme, c->inject_data.url);
+        snprintf(c->inject_data.url, sizeof(c->inject_data.url), "%s%s", c->inner_scheme, arg);
     }
-    snprintf(c->inject_data.url, sizeof(c->inject_data.url), "%s%s", c->inner_scheme, arg);
 
-    return ijkurlhook_connect(h);
+    return ret;
 }
 
 static int ijktcphook_open(URLContext *h, const char *arg, int flags, AVDictionary **options)
 {
     Context *c = h->priv_data;
+    int ret = 0;
+
     c->scheme = "ijktcphook:";
     c->inner_scheme = "tcp:";
     c->open_callback_id = IJKAVINJECT_ON_TCP_OPEN;
-    return ijkurlhook_open(h, arg, flags, options);
-}
+    ret = ijkurlhook_init(h, arg, flags, options);
+    if (ret)
+        goto fail;
 
-static int ijkhttphook_open(URLContext *h, const char *arg, int flags, AVDictionary **options)
-{
-    Context *c = h->priv_data;
-    c->scheme = "ijkhttphook:";
-    c->inner_scheme = "http:";
-    c->open_callback_id = IJKAVINJECT_ON_HTTP_OPEN;
-    return ijkurlhook_open(h, arg, flags, options);
+    ret = ijkurlhook_call_inject(h);
+    if (ret)
+        goto fail;
+
+    ret = ijkurlhook_reconnect(h, NULL);
+    if (ret)
+        goto fail;
+
+fail:
+    return ret;
 }
 
 static int ijkurlhook_close(URLContext *h)
@@ -144,21 +180,28 @@ static int ijkurlhook_close(URLContext *h)
     Context *c = h->priv_data;
 
     av_dict_free(&c->inner_options);
-    return ffurl_close(c->inner);
+    return ffurl_closep(&c->inner);
 }
 
 static int ijkurlhook_read(URLContext *h, unsigned char *buf, int size)
 {
     Context *c = h->priv_data;
-    int ret = ffurl_read(c->inner, buf, size);
+    int ret = 0;
 
-    if (ret > 0) {
-        c->logical_pos += ret;
-#ifdef DEBUG
-        if (c->test_fail_point > 0 && c->logical_pos >= c->test_fail_point)
-            return AVERROR(EIO);
-#endif
+    if (c->io_error < 0)
+        return c->io_error;
+
+    if (c->test_fail_point_next > 0 && c->logical_pos >= c->test_fail_point_next) {
+        av_log(h, AV_LOG_ERROR, "test fail point:%"PRId64"\n", c->test_fail_point_next);
+        c->io_error = AVERROR(EIO);
+        return AVERROR(EIO);
     }
+
+    ret = ffurl_read(c->inner, buf, size);
+    if (ret > 0)
+        c->logical_pos += ret;
+    else
+        c->io_error = ret;
 
     return ret;
 }
@@ -173,34 +216,215 @@ static int ijkurlhook_write(URLContext *h, const unsigned char *buf, int size)
 static int64_t ijkurlhook_seek(URLContext *h, int64_t pos, int whence)
 {
     Context *c = h->priv_data;
+    int64_t seek_ret = 0;
 
-    return ffurl_seek(c->inner, pos, whence);
+    seek_ret = ffurl_seek(c->inner, pos, whence);
+    if (seek_ret < 0) {
+        c->io_error = (int)seek_ret;
+        return seek_ret;
+    }
+
+    c->logical_pos = seek_ret;
+    if (c->test_fail_point)
+        c->test_fail_point_next = c->logical_pos + c->test_fail_point;
+
+    c->io_error = 0;
+    return seek_ret;
+}
+
+static int ijkhttphook_reconnect_at(URLContext *h, int64_t offset)
+{
+    AVDictionary *extra_opts = NULL;
+
+    av_dict_set_int(&extra_opts, "offset", offset, 0);
+    int ret = ijkurlhook_reconnect(h, extra_opts);
+    av_dict_free(&extra_opts);
+    return ret;
+}
+
+static int ijkhttphook_open(URLContext *h, const char *arg, int flags, AVDictionary **options)
+{
+    Context *c = h->priv_data;
+    int ret = 0;
+
+    c->scheme = "ijkhttphook:";
+    c->inner_scheme = "http:";
+    c->open_callback_id = IJKAVINJECT_ON_HTTP_OPEN;
+
+    ret = ijkurlhook_init(h, arg, flags, options);
+    if (ret)
+        goto fail;
+
+    ret = ijkurlhook_call_inject(h);
+    if (ret)
+        goto fail;
+
+    ret = ijkurlhook_reconnect(h, NULL);
+    while (ret) {
+        switch (ret) {
+            case AVERROR_EXIT:
+                goto fail;
+        }
+
+        c->inject_data.retry_counter++;
+        ret = ijkurlhook_call_inject(h);
+        if (ret) {
+            ret = AVERROR_EXIT;
+            goto fail;
+        }
+
+        if (!c->inject_data.is_handled)
+            goto fail;
+
+        av_log(h, AV_LOG_INFO, "%s: will reconnect at start\n", __func__);
+        ret = ijkurlhook_reconnect(h, NULL);
+        av_log(h, AV_LOG_INFO, "%s: did reconnect at start: %d\n", __func__, ret);
+        if (ret)
+            c->inject_data.retry_counter++;
+    }
+
+fail:
+    return ret;
+}
+
+static int ijkhttphook_read(URLContext *h, unsigned char *buf, int size)
+{
+    Context *c = h->priv_data;
+    int ret = 0;
+    int read_ret = AVERROR(EIO);
+
+    c->inject_data.retry_counter = 0;
+
+    read_ret = ijkurlhook_read(h, buf, size);
+    while (read_ret < 0 && !h->is_streamed && c->logical_pos < c->logical_size) {
+        c->io_error = read_ret;
+        switch (read_ret) {
+            case AVERROR_EXIT:
+                goto fail;
+        }
+
+        c->inject_data.retry_counter++;
+        ret = ijkurlhook_call_inject(h);
+        if (ret) {
+            read_ret = AVERROR_EXIT;
+            goto fail;
+        }
+
+        if (!c->inject_data.is_handled)
+            goto fail;
+
+        av_log(h, AV_LOG_INFO, "%s: will reconnect(%d) at %"PRId64"\n", __func__, c->inject_data.retry_counter, c->logical_pos);
+        ret = ijkhttphook_reconnect_at(h, c->logical_pos);
+        av_log(h, AV_LOG_INFO, "%s: did reconnect(%d) at %"PRId64": %d\n", __func__, c->inject_data.retry_counter, c->logical_pos, ret);
+        if (ret)
+            continue;
+
+        read_ret = ijkurlhook_read(h, buf, size);
+    }
+
+fail:
+    return read_ret;
+}
+
+static int64_t ijkhttphook_reseek_at(URLContext *h, int64_t pos, int whence, int force_reconnect)
+{
+    Context *c = h->priv_data;
+    int ret = 0;
+
+    if (!force_reconnect)
+        return ijkurlhook_seek(h, pos, whence);
+
+    if (whence == SEEK_CUR)
+        pos += c->logical_pos;
+    else if (whence == SEEK_END)
+        pos += c->logical_size;
+    else if (whence != SEEK_SET)
+        return AVERROR(EINVAL);
+    if (pos < 0)
+        return AVERROR(EINVAL);
+
+    ret = ijkhttphook_reconnect_at(h, pos);
+    if (ret) {
+        c->io_error = ret;
+        return ret;
+    }
+
+    c->io_error = 0;
+    return c->logical_pos;
+}
+
+static int64_t ijkhttphook_seek(URLContext *h, int64_t pos, int whence)
+{
+    Context *c = h->priv_data;
+    int     ret      = 0;
+    int64_t seek_ret = -1;
+
+    if (whence == AVSEEK_SIZE)
+        return c->logical_size;
+    else if ((whence == SEEK_CUR && pos == 0) ||
+             (whence == SEEK_SET && pos == c->logical_pos))
+        return c->logical_pos;
+    else if ((c->logical_size < 0 && whence == SEEK_END) || h->is_streamed)
+        return AVERROR(ENOSYS);
+
+    c->inject_data.retry_counter = 0;
+    ret = ijkurlhook_call_inject(h);
+    if (ret) {
+        ret = AVERROR_EXIT;
+        goto fail;
+    }
+
+    seek_ret = ijkhttphook_reseek_at(h, pos, whence, c->inject_data.is_url_changed);
+    while (seek_ret < 0) {
+        switch (seek_ret) {
+            case AVERROR_EXIT:
+            case AVERROR_EOF:
+                goto fail;
+        }
+
+        c->inject_data.retry_counter++;
+        ret = ijkurlhook_call_inject(h);
+        if (ret) {
+            ret = AVERROR_EXIT;
+            goto fail;
+        }
+
+        if (!c->inject_data.is_handled)
+            goto fail;
+
+        av_log(h, AV_LOG_INFO, "%s: will reseek(%d) at pos=%"PRId64", whence=%d\n", __func__, c->inject_data.retry_counter, pos, whence);
+        seek_ret = ijkhttphook_reseek_at(h, pos, whence, c->inject_data.is_url_changed);
+        av_log(h, AV_LOG_INFO, "%s: did reseek(%d) at pos=%"PRId64", whence=%d: %"PRId64"\n", __func__, c->inject_data.retry_counter, pos, whence, seek_ret);
+    }
+
+    if (c->test_fail_point)
+        c->test_fail_point_next = c->logical_pos + c->test_fail_point;
+    c->io_error = 0;
+    return c->logical_pos;
+fail:
+    return ret;
 }
 
 #define OFFSET(x) offsetof(Context, x)
 #define D AV_OPT_FLAG_DECODING_PARAM
 
 static const AVOption ijktcphook_options[] = {
-    { "ijkinject-opaque",           "private data of user, passed with custom callback",
-        OFFSET(opaque),             IJKAV_OPTION_INT64(0, INT64_MIN, INT64_MAX) },
-    { "ijkinject-segment-index",    "segment index of current url",
-        OFFSET(segment_index),      IJKAV_OPTION_INT(0, 0, INT_MAX) },
-#ifdef DEBUG
-    { "ijkurlhook-test-fail-point", "test fail point, in bytes",
-        OFFSET(test_fail_point),    IJKAV_OPTION_INT(0, 0, INT_MAX) },
-#endif
+    { "ijkinject-opaque",               "private data of user, passed with custom callback",
+        OFFSET(opaque),                 IJKAV_OPTION_INT64(0, INT64_MIN, INT64_MAX) },
+    { "ijkinject-segment-index",        "segment index of current url",
+        OFFSET(segment_index),          IJKAV_OPTION_INT(0, 0, INT_MAX) },
+    { "ijktcphook-test-fail-point",     "test fail point, in bytes",
+        OFFSET(test_fail_point),        IJKAV_OPTION_INT(0, 0, INT_MAX) },
     { NULL }
 };
 
 static const AVOption ijkhttphook_options[] = {
-    { "ijkinject-opaque",           "private data of user, passed with custom callback",
-        OFFSET(opaque),             IJKAV_OPTION_INT64(0, INT64_MIN, INT64_MAX) },
-    { "ijkinject-segment-index",    "segment index of current url",
-        OFFSET(segment_index),      IJKAV_OPTION_INT(0, 0, INT_MAX) },
-#ifdef DEBUG
-    { "ijkurlhook-test-fail-point", "test fail point, in bytes",
-        OFFSET(test_fail_point),    IJKAV_OPTION_INT(0, 0, INT_MAX) },
-#endif
+    { "ijkinject-opaque",               "private data of user, passed with custom callback",
+        OFFSET(opaque),                 IJKAV_OPTION_INT64(0, INT64_MIN, INT64_MAX) },
+    { "ijkinject-segment-index",        "segment index of current url",
+        OFFSET(segment_index),          IJKAV_OPTION_INT(0, 0, INT_MAX) },
+    { "ijkhttphook-test-fail-point",    "test fail point, in bytes",
+        OFFSET(test_fail_point),        IJKAV_OPTION_INT(0, 0, INT_MAX) },
     { NULL }
 };
 
@@ -219,7 +443,6 @@ URLProtocol ijkff_ijktcphook_protocol = {
     .url_open2           = ijktcphook_open,
     .url_read            = ijkurlhook_read,
     .url_write           = ijkurlhook_write,
-    .url_seek            = ijkurlhook_seek,
     .url_close           = ijkurlhook_close,
     .priv_data_size      = sizeof(Context),
     .priv_data_class     = &ijktcphook_context_class,
@@ -235,9 +458,9 @@ static const AVClass ijkhttphook_context_class = {
 URLProtocol ijkff_ijkhttphook_protocol = {
     .name                = "ijkhttphook",
     .url_open2           = ijkhttphook_open,
-    .url_read            = ijkurlhook_read,
+    .url_read            = ijkhttphook_read,
     .url_write           = ijkurlhook_write,
-    .url_seek            = ijkurlhook_seek,
+    .url_seek            = ijkhttphook_seek,
     .url_close           = ijkurlhook_close,
     .priv_data_size      = sizeof(Context),
     .priv_data_class     = &ijkhttphook_context_class,

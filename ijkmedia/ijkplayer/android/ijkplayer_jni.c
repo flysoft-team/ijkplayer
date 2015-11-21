@@ -406,6 +406,51 @@ LABEL_RETURN:
     return;
 }
 
+static jlong
+ijkMediaPlayer_getPropertyLong(JNIEnv *env, jobject thiz, jint id, jlong default_value)
+{
+    jlong value = default_value;
+    IjkMediaPlayer *mp = jni_get_media_player(env, thiz);
+    JNI_CHECK_GOTO(mp, env, NULL, "mpjni: getPropertyLong: null mp", LABEL_RETURN);
+
+    value = ijkmp_get_property_int64(mp, id, default_value);
+
+LABEL_RETURN:
+    ijkmp_dec_ref_p(&mp);
+    return value;
+}
+
+static void
+ijkMediaPlayer_setPropertyLong(JNIEnv *env, jobject thiz, jint id, jlong value)
+{
+    IjkMediaPlayer *mp = jni_get_media_player(env, thiz);
+    JNI_CHECK_GOTO(mp, env, NULL, "mpjni: setPropertyLong: null mp", LABEL_RETURN);
+
+    ijkmp_set_property_int64(mp, id, value);
+
+LABEL_RETURN:
+    ijkmp_dec_ref_p(&mp);
+    return;
+}
+
+static void
+ijkMediaPlayer_setStreamSelected(JNIEnv *env, jobject thiz, jint stream, jboolean selected)
+{
+    IjkMediaPlayer *mp = jni_get_media_player(env, thiz);
+    int ret = 0;
+    JNI_CHECK_GOTO(mp, env, NULL, "mpjni: setStreamSelected: null mp", LABEL_RETURN);
+
+    ret = ijkmp_set_stream_selected(mp, stream, selected);
+    if (ret < 0) {
+        ALOGE("failed to %s %d", selected ? "select" : "deselect", stream);
+        goto LABEL_RETURN;
+    }
+
+LABEL_RETURN:
+    ijkmp_dec_ref_p(&mp);
+    return;
+}
+
 static void
 IjkMediaPlayer_setVolume(JNIEnv *env, jobject thiz, jfloat leftVolume, jfloat rightVolume)
 {
@@ -655,7 +700,7 @@ IjkMediaPlayer_native_setup(JNIEnv *env, jobject thiz, jobject weak_this)
 
     jni_set_media_player(env, thiz, mp);
     ijkmp_set_weak_thiz(mp, (*env)->NewGlobalRef(env, weak_this));
-    ijkmp_set_inject_opaque(mp, (*env)->NewGlobalRef(env, weak_this));
+    ijkmp_set_inject_opaque(mp, ijkmp_get_weak_thiz(mp));
     ijkmp_android_set_mediacodec_select_callback(mp, mediacodec_select_callback, (*env)->NewGlobalRef(env, weak_this));
 
 LABEL_RETURN:
@@ -676,6 +721,7 @@ inject_callback(void *opaque, int what, void *data, size_t data_size)
     JNIEnv     *env     = NULL;
     jobject     jbundle = NULL;
     int         ret     = -1;
+    int         is_handled = 0;
     SDL_JNI_SetupThreadEnv(&env);
 
     jobject weak_thiz = (jobject) opaque;
@@ -689,6 +735,8 @@ inject_callback(void *opaque, int what, void *data, size_t data_size)
     case IJKAVINJECT_ON_HTTP_RETRY:
     case IJKAVINJECT_ON_LIVE_RETRY: {
         IJKAVInject_OnUrlOpenData *real_data = (IJKAVInject_OnUrlOpenData *) data;
+        real_data->is_handled = 0;
+
         jbundle = JJKC_Bundle__Bundle__catchAll(env);
         if (!jbundle) {
             ALOGE("%s: ASDK_Bundle__init failed\n", __func__);
@@ -699,7 +747,7 @@ inject_callback(void *opaque, int what, void *data, size_t data_size)
         JJKC_Bundle__putInt__withCString__catchAll(env, jbundle,     "segment_index", real_data->segment_index);
         JJKC_Bundle__putInt__withCString__catchAll(env, jbundle,     "retry_counter", real_data->retry_counter);
 
-        JJKC_IjkMediaPlayer__onNativeInvoke__catchAll(env, weak_thiz, what, jbundle);
+        is_handled = JJKC_IjkMediaPlayer__onNativeInvoke__catchAll(env, weak_thiz, what, jbundle);
         if (JJK_ExceptionCheck__catchAll(env))
             goto fail;
 
@@ -707,6 +755,7 @@ inject_callback(void *opaque, int what, void *data, size_t data_size)
         if (JJK_ExceptionCheck__catchAll(env))
             goto fail;
 
+        real_data->is_handled = is_handled;
         ret = 0;
         break;
     }
@@ -950,6 +999,9 @@ static JNINativeMethod g_methods[] = {
     { "_getLoopCount",          "()I",                      (void *) IjkMediaPlayer_getLoopCount },
     { "_getPropertyFloat",      "(IF)F",                    (void *) ijkMediaPlayer_getPropertyFloat },
     { "_setPropertyFloat",      "(IF)V",                    (void *) ijkMediaPlayer_setPropertyFloat },
+    { "_getPropertyLong",       "(IJ)J",                    (void *) ijkMediaPlayer_getPropertyLong },
+    { "_setPropertyLong",       "(IJ)V",                    (void *) ijkMediaPlayer_setPropertyLong },
+    { "_setStreamSelected",     "(IZ)V",                    (void *) ijkMediaPlayer_setStreamSelected },
 
     { "native_profileBegin",    "(Ljava/lang/String;)V",    (void *) IjkMediaPlayer_native_profileBegin },
     { "native_profileEnd",      "()V",                      (void *) IjkMediaPlayer_native_profileEnd },

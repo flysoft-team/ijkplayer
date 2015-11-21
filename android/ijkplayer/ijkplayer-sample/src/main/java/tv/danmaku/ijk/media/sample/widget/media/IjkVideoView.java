@@ -1061,9 +1061,12 @@ public class IjkVideoView extends FrameLayout implements MediaController.MediaPl
         if (mMediaPlayer == null)
             return;
 
+        int selectedVideoTrack = MediaPlayerCompat.getSelectedTrack(mMediaPlayer, ITrackInfo.MEDIA_TRACK_TYPE_VIDEO);
+        int selectedAudioTrack = MediaPlayerCompat.getSelectedTrack(mMediaPlayer, ITrackInfo.MEDIA_TRACK_TYPE_AUDIO);
+
         TableLayoutBinder builder = new TableLayoutBinder(getContext());
         builder.appendSection(R.string.mi_player);
-        builder.appendRow2(R.string.mi_player, mMediaPlayer.getClass().getSimpleName());
+        builder.appendRow2(R.string.mi_player, MediaPlayerCompat.getName(mMediaPlayer));
         builder.appendSection(R.string.mi_media);
         builder.appendRow2(R.string.mi_resolution, buildResolution(mVideoWidth, mVideoHeight, mVideoSarNum, mVideoSarDen));
         builder.appendRow2(R.string.mi_length, buildTimeMilli(mMediaPlayer.getDuration()));
@@ -1075,7 +1078,13 @@ public class IjkVideoView extends FrameLayout implements MediaController.MediaPl
                 index++;
 
                 int trackType = trackInfo.getTrackType();
-                builder.appendSection(getContext().getString(R.string.mi_stream_fmt1, index));
+                if (index == selectedVideoTrack) {
+                    builder.appendSection(getContext().getString(R.string.mi_stream_fmt1, index) + " " + getContext().getString(R.string.mi__selected_video_track));
+                } else if (index == selectedAudioTrack) {
+                    builder.appendSection(getContext().getString(R.string.mi_stream_fmt1, index) + " " + getContext().getString(R.string.mi__selected_audio_track));
+                } else {
+                    builder.appendSection(getContext().getString(R.string.mi_stream_fmt1, index));
+                }
                 builder.appendRow2(R.string.mi_type, buildTrackType(trackType));
 
                 IMediaFormat mediaFormat = trackInfo.getFormat();
@@ -1161,5 +1170,24 @@ public class IjkVideoView extends FrameLayout implements MediaController.MediaPl
             default:
                 return context.getString(R.string.TrackType_unknown);
         }
+    }
+
+    public ITrackInfo[] getTrackInfo() {
+        if (mMediaPlayer == null)
+            return null;
+
+        return mMediaPlayer.getTrackInfo();
+    }
+
+    public void selectTrack(int stream) {
+        MediaPlayerCompat.selectTrack(mMediaPlayer, stream);
+    }
+
+    public void deselectTrack(int stream) {
+        MediaPlayerCompat.deselectTrack(mMediaPlayer, stream);
+    }
+
+    public int getSelectedTrack(int trackType) {
+        return MediaPlayerCompat.getSelectedTrack(mMediaPlayer, trackType);
     }
 }
