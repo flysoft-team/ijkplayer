@@ -71,3 +71,13 @@ SDL_Aout *ffpipeline_open_audio_output(IJKFF_Pipeline *pipeline, FFPlayer *ffp)
 {
     return pipeline->func_open_audio_output(pipeline, ffp);
 }
+
+void ffpipeline_setVolume(IJKFF_Pipeline *pipeline, float left,float right)
+{
+    return pipeline->func_set_volume(pipeline, left, right);
+}
+
+void ffpipeline_updateVolume(IJKFF_Pipeline *pipeline)
+{
+    return pipeline->func_update_volume(pipeline);
+}

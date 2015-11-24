@@ -30,9 +30,21 @@ static SDL_Class g_pipeline_class = {
 
 struct IJKFF_Pipeline_Opaque {
     FFPlayer *ffp;
+    float left_volume;
+    float right_volume;
 };
 
 static void func_destroy(IJKFF_Pipeline *pipeline)
+{
+    // do nothing
+}
+
+static void func_set_volume(IJKFF_Pipeline *pipeline,float left, float right)
+{
+    // do nothing
+}
+
+static void func_update_volume(IJKFF_Pipeline *pipeline)
 {
     // do nothing
 }
@@ -59,6 +71,8 @@ IJKFF_Pipeline *ffpipeline_create_from_ffplay(FFPlayer *ffp)
     pipeline->func_destroy            = func_destroy;
     pipeline->func_open_video_decoder = func_open_video_decoder;
     pipeline->func_open_audio_output  = func_open_audio_output;
+    pipeline->func_set_volume = func_set_volume;
+    pipeline->func_update_volume = func_update_volume;
 
     return pipeline;
 }

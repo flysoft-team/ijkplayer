@@ -38,6 +38,8 @@ struct IJKFF_Pipeline {
     void            (*func_destroy)             (IJKFF_Pipeline *pipeline);
     IJKFF_Pipenode *(*func_open_video_decoder)  (IJKFF_Pipeline *pipeline, FFPlayer *ffp);
     SDL_Aout       *(*func_open_audio_output)   (IJKFF_Pipeline *pipeline, FFPlayer *ffp);
+    void            (*func_set_volume)          (IJKFF_Pipeline *pipeline,float left,float right);
+    void            (*func_update_volume)       (IJKFF_Pipeline *pipeline);
 };
 
 IJKFF_Pipeline *ffpipeline_alloc(SDL_Class *opaque_class, size_t opaque_size);
@@ -47,4 +49,6 @@ void ffpipeline_free_p(IJKFF_Pipeline **pipeline);
 IJKFF_Pipenode *ffpipeline_open_video_decoder(IJKFF_Pipeline *pipeline, FFPlayer *ffp);
 SDL_Aout       *ffpipeline_open_audio_output(IJKFF_Pipeline *pipeline, FFPlayer *ffp);
 
+void ffpipeline_setVolume(IJKFF_Pipeline *pipeline,float left,float right);
+void ffpipeline_updateVolume(IJKFF_Pipeline *pipeline);
 #endif

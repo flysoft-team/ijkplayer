@@ -466,7 +466,7 @@ typedef struct FFPlayer {
     AVInputFormat *file_iformat;
 #endif
     char *input_filename;
-   
+
 #ifdef FFP_MERGE
     const char *window_title;
     int fs_screen_width;
@@ -475,9 +475,8 @@ typedef struct FFPlayer {
     int default_height;
     int screen_width;
     int screen_height;
-   
+
 #endif
-    float audioVolume;
     int audio_disable;
     int video_disable;
 #ifdef FFP_MERGE

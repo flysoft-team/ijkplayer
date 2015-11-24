@@ -83,7 +83,7 @@ void ijkmp_android_set_volume(JNIEnv *env, IjkMediaPlayer *mp, float left, float
     pthread_mutex_lock(&mp->mutex);
 
     if (mp && mp->ffplayer && mp->ffplayer->pipeline) {
-        ffpipeline_set_volume(mp->ffplayer->pipeline, left, right);
+        ffpipeline_setVolume(mp->ffplayer->pipeline, left, right);
     }
 
     pthread_mutex_unlock(&mp->mutex);

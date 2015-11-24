@@ -42,9 +42,10 @@ typedef struct IJKFF_Pipeline_Opaque {
     void          *mediacodec_select_callback_opaque;
 
     SDL_Vout      *weak_vout;
+    
+    float left_volume;
+    float right_volume;
 
-    float          left_volume;
-    float          right_volume;
 } IJKFF_Pipeline_Opaque;
 
 static void func_destroy(IJKFF_Pipeline *pipeline)
@@ -91,6 +92,9 @@ static SDL_Aout *func_open_audio_output(IJKFF_Pipeline *pipeline, FFPlayer *ffp)
     return aout;
 }
 
+static void func_set_volume(IJKFF_Pipeline* pipeline, float left, float right);
+static void func_update_volume(IJKFF_Pipeline* pipeline);
+
 
 inline static bool check_ffpipeline(IJKFF_Pipeline* pipeline, const char *func_name)
 {
@@ -127,6 +131,8 @@ IJKFF_Pipeline *ffpipeline_create_from_android(FFPlayer *ffp)
     pipeline->func_destroy            = func_destroy;
     pipeline->func_open_video_decoder = func_open_video_decoder;
     pipeline->func_open_audio_output  = func_open_audio_output;
+    pipeline->func_set_volume = func_set_volume;
+    pipeline->func_update_volume = func_update_volume;
 
     return pipeline;
 fail:
@@ -254,7 +260,7 @@ bool ffpipeline_select_mediacodec_l(IJKFF_Pipeline* pipeline, ijkmp_mediacodecin
     return pipeline->opaque->mediacodec_select_callback(pipeline->opaque->mediacodec_select_callback_opaque, mcc);
 }
 
-void ffpipeline_set_volume(IJKFF_Pipeline* pipeline, float left, float right)
+static void func_set_volume(IJKFF_Pipeline* pipeline, float left, float right)
 {
     ALOGD("%s\n", __func__);
     if (!check_ffpipeline(pipeline, __func__))
@@ -266,5 +272,18 @@ void ffpipeline_set_volume(IJKFF_Pipeline* pipeline, float left, float right)
 
     if (opaque->ffp && opaque->ffp->aout) {
         SDL_AoutSetStereoVolume(opaque->ffp->aout, left, right);
+    }
+}
+
+static void func_update_volume(IJKFF_Pipeline* pipeline)
+{
+    ALOGD("%s\n", __func__);
+    if (!check_ffpipeline(pipeline, __func__))
+        return;
+    
+    IJKFF_Pipeline_Opaque *opaque = pipeline->opaque;
+    
+    if (opaque->ffp && opaque->ffp->aout) {
+        SDL_AoutSetStereoVolume(opaque->ffp->aout, opaque->left_volume, opaque->right_volume);
     }
 }

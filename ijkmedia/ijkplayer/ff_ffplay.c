@@ -127,21 +127,9 @@ int64_t get_valid_channel_layout(int64_t channel_layout, int channels)
 
 static void free_picture(Frame *vp);
 
-void ffp_set_volume(FFPlayer *ffp, float volume){
-    ffp->audioVolume = volume;
-    
-    if (!ffp->is || !ffp->is->play_mutex){
-        return;
-    }
-    
-//    SDL_LockMutex(ffp->is->play_mutex);
-    
-    if (ffp->aout){
-        SDL_AoutSetStereoVolume(ffp->aout, volume, volume);
-        return;
-    }
- 
-//    SDL_UnlockMutex(ffp->is->play_mutex);
+static void ffp_update_sound_volume(FFPlayer *ffp){
+    IJKFF_Pipeline* pipeline = ffp->pipeline;
+    ffpipeline_updateVolume(pipeline);
 }
 
 static int packet_queue_put_private(PacketQueue *q, AVPacket *pkt)
@@ -949,8 +937,7 @@ static void toggle_pause_l(FFPlayer *ffp, int pause_on)
         ffp_notify_msg1(ffp, FFP_MSG_SEEK_COMPLETE);
         is->step = 0;
     }
-    SDL_AoutSetStereoVolume(ffp->aout,ffp->audioVolume,ffp->audioVolume);
-
+    ffp_update_sound_volume(ffp);
 }
 
 static void toggle_pause(FFPlayer *ffp, int pause_on)
@@ -1121,10 +1108,10 @@ display:
             if (is->step) {
                 is->step = 0;
                 ffp_notify_msg1(ffp, FFP_MSG_SEEK_COMPLETE);
-                SDL_AoutSetStereoVolume(ffp->aout,ffp->audioVolume,ffp->audioVolume);
+                ffp_update_sound_volume(ffp);
                 if (!is->paused)
                     stream_update_pause_l(ffp);
-                
+
             }
             SDL_UnlockMutex(ffp->is->play_mutex);
         }
@@ -2169,7 +2156,7 @@ static int audio_open(FFPlayer *opaque, int64_t wanted_channel_layout, int wante
             return -1;
         }
     }
-    SDL_AoutSetStereoVolume(ffp->aout,ffp->audioVolume,ffp->audioVolume);
+    ffp_update_sound_volume(ffp);
     audio_hw_params->fmt = AV_SAMPLE_FMT_S16;
     audio_hw_params->freq = spec.freq;
     audio_hw_params->channel_layout = wanted_channel_layout;
@@ -2724,10 +2711,10 @@ static int read_thread(void *arg)
             else {
                 ffp_notify_msg1(ffp, FFP_MSG_SEEK_COMPLETE);
             }
-            
+
 
             SDL_UnlockMutex(ffp->is->play_mutex);
-            
+
             ffp_toggle_buffering(ffp, 1);
         }
         if (is->queue_attachments_req) {
