@@ -27,12 +27,13 @@
 #import "IJKMediaPlayback.h"
 #import "IJKMediaModule.h"
 #import "IJKAudioKit.h"
+#import "NSString+IJKMedia.h"
 
 #include "string.h"
 #include "ijkplayer/version.h"
 #include "ijkplayer/ijkavformat/ijkavformat.h"
 
-static const char *kIJKFFRequiredFFmpegVersion = "ff2.8--ijk0.4.1.1--dev0.3.3--rc4";
+static const char *kIJKFFRequiredFFmpegVersion = "ff2.8--ijk0.4.4.1--dev0.3.3--rc7";
 
 @interface IJKFFMoviePlayerController()
 
@@ -43,8 +44,6 @@ static const char *kIJKFFRequiredFFmpegVersion = "ff2.8--ijk0.4.1.1--dev0.3.3--r
 @end
 
 @implementation IJKFFMoviePlayerController {
-    id<IJKMediaSegmentResolver> _segmentResolver;
-
     IjkMediaPlayer *_mediaPlayer;
     IJKSDLGLView *_glView;
     IJKFFMoviePlayerMessagePool *_msgPool;
@@ -65,6 +64,12 @@ static const char *kIJKFFRequiredFFmpegVersion = "ff2.8--ijk0.4.1.1--dev0.3.3--r
     BOOL _playingBeforeInterruption;
     
     NSMutableArray *_registeredNotifications;
+
+    IJKAVInject_AsyncStatistic _asyncStat;
+    IJKAVInject_AsyncReadSpeed _asyncReadSpeedStartup;
+    IJKAVInject_AsyncReadSpeed _asyncReadSpeed;
+    BOOL _shouldShowHudView;
+    NSTimer *_hudTimer;
 }
 
 @synthesize view = _view;
@@ -142,16 +147,8 @@ void IJKFFIOStatCompleteRegister(void (*cb)(const char *url,
     ijkmp_io_stat_complete_register(cb);
 }
 
-- (id)initWithContentURL:(NSURL *)aUrl withOptions:(IJKFFOptions *)options
-{
-    return [self initWithContentURL:aUrl
-                        withOptions:options
-                withSegmentResolver:nil];
-}
-
 - (id)initWithContentURL:(NSURL *)aUrl
              withOptions:(IJKFFOptions *)options
-     withSegmentResolver:(id<IJKMediaSegmentResolver>)segmentResolver
 {
     if (aUrl == nil)
         return nil;
@@ -160,13 +157,11 @@ void IJKFFIOStatCompleteRegister(void (*cb)(const char *url,
     NSString *aUrlString = [aUrl isFileURL] ? [aUrl path] : [aUrl absoluteString];
 
     return [self initWithContentURLString:aUrlString
-                              withOptions:options
-                      withSegmentResolver:segmentResolver];
+                              withOptions:options];
 }
 
 - (id)initWithContentURLString:(NSString *)aUrlString
                    withOptions:(IJKFFOptions *)options
-           withSegmentResolver:(id<IJKMediaSegmentResolver>)segmentResolver
 {
     if (aUrlString == nil)
         return nil;
@@ -187,10 +182,10 @@ void IJKFFIOStatCompleteRegister(void (*cb)(const char *url,
         // init fields
         _scalingMode = IJKMPMovieScalingModeAspectFit;
         _shouldAutoplay = YES;
+        memset(&_asyncStat, 0, sizeof(_asyncStat));
 
         // init media resource
         _urlString = aUrlString;
-        _segmentResolver = segmentResolver;
         _mediaMeta = [[NSDictionary alloc] init];
 
         // init player
@@ -204,7 +199,14 @@ void IJKFFIOStatCompleteRegister(void (*cb)(const char *url,
         // init video sink
         _glView = [[IJKSDLGLView alloc] initWithFrame:[[UIScreen mainScreen] bounds]
                                        useRenderQueue:options.useRenderQueue];
+        _glView.shouldShowHudView = NO;
         _view   = _glView;
+        [_glView setHudValue:nil forKey:@"scheme"];
+        [_glView setHudValue:nil forKey:@"host"];
+        [_glView setHudValue:nil forKey:@"path"];
+        [_glView setHudValue:nil forKey:@"ip"];
+        
+        self.shouldShowHudView = options.showHudView;
 
         ijkmp_ios_set_glview(_mediaPlayer, _glView);
         ijkmp_set_option(_mediaPlayer, IJKMP_OPT_CATEGORY_PLAYER, "overlay-format", "fcc-i420");
@@ -260,11 +262,46 @@ void IJKFFIOStatCompleteRegister(void (*cb)(const char *url,
     if (!_mediaPlayer)
         return;
 
+    if (_urlString != nil) {
+        [self setHudUrl:_urlString];
+    }
+
     [self setScreenOn:_keepScreenOnWhilePlaying];
 
     ijkmp_set_data_source(_mediaPlayer, [_urlString UTF8String]);
     ijkmp_set_option(_mediaPlayer, IJKMP_OPT_CATEGORY_FORMAT, "safe", "0"); // for concat demuxer
     ijkmp_prepare_async(_mediaPlayer);
+}
+
+- (void)setHudUrl:(NSString *)urlString
+{
+    if ([[NSThread currentThread] isMainThread]) {
+        NSRange range = [urlString rangeOfString:@"://"];
+        if (range.location != NSNotFound) {
+            NSString *urlFullScheme = [urlString substringToIndex:range.location];
+
+            NSRange rangeOfLastScheme = [urlFullScheme rangeOfString:@":"
+                                                             options:NSBackwardsSearch
+                                                               range:NSMakeRange(0, range.location)];
+            if (rangeOfLastScheme.location != NSNotFound) {
+                NSString *urlExtra  = [urlString substringFromIndex:rangeOfLastScheme.location + 1];
+                NSURL *url = [NSURL URLWithString:urlExtra];
+                [_glView setHudValue:urlFullScheme  forKey:@"scheme"];
+                [_glView setHudValue:url.host       forKey:@"host"];
+                [_glView setHudValue:url.path       forKey:@"path"];
+                return;
+            }
+        }
+
+        NSURL *url = [NSURL URLWithString:urlString];
+        [_glView setHudValue:url.scheme forKey:@"scheme"];
+        [_glView setHudValue:url.host   forKey:@"host"];
+        [_glView setHudValue:url.path   forKey:@"path"];
+    } else {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self setHudUrl:urlString];
+        });
+    }
 }
 
 - (void)play
@@ -274,6 +311,7 @@ void IJKFFIOStatCompleteRegister(void (*cb)(const char *url,
 
     [self setScreenOn:_keepScreenOnWhilePlaying];
 
+    [self startHudTimer];
     ijkmp_start(_mediaPlayer);
 }
 
@@ -282,6 +320,7 @@ void IJKFFIOStatCompleteRegister(void (*cb)(const char *url,
     if (!_mediaPlayer)
         return;
 
+//    [self stopHudTimer];
     ijkmp_pause(_mediaPlayer);
 }
 
@@ -292,6 +331,7 @@ void IJKFFIOStatCompleteRegister(void (*cb)(const char *url,
 
     [self setScreenOn:NO];
 
+    [self stopHudTimer];
     ijkmp_stop(_mediaPlayer);
 }
 
@@ -418,6 +458,8 @@ inline static int getPlayerOption(IJKFFOptionCategory category)
 {
     if (!_mediaPlayer)
         return;
+
+    [self stopHudTimer];
     [self unregisterApplicationObservers];
     [self setScreenOn:NO];
 
@@ -431,6 +473,7 @@ inline static int getPlayerOption(IJKFFOptionCategory category)
 
     ijkmp_stop(_mediaPlayer);
     ijkmp_shutdown(_mediaPlayer);
+
     [self performSelectorOnMainThread:@selector(shutdownClose:) withObject:self waitUntilDone:YES];
 }
 
@@ -438,6 +481,11 @@ inline static int getPlayerOption(IJKFFOptionCategory category)
 {
     if (!_mediaPlayer)
         return;
+
+    _segmentOpenDelegate    = nil;
+    _tcpOpenDelegate        = nil;
+    _httpOpenDelegate       = nil;
+    _liveOpenDelegate       = nil;
 
     ijkmp_dec_ref_p(&_mediaPlayer);
 }
@@ -522,8 +570,18 @@ inline static int getPlayerOption(IJKFFOptionCategory category)
     if (!_mediaPlayer)
         return 0.0f;
 
-    NSTimeInterval ret = ijkmp_get_playable_duration(_mediaPlayer);
-    return ret / 1000;
+    NSTimeInterval demux_cache = ((NSTimeInterval)ijkmp_get_playable_duration(_mediaPlayer)) / 1000;
+
+    int64_t buf_forwards = _asyncStat.buf_forwards;
+    if (buf_forwards > 0) {
+        int64_t bit_rate = ijkmp_get_property_int64(_mediaPlayer, FFP_PROP_INT64_BIT_RATE, 0);
+        if (bit_rate > 0) {
+            NSTimeInterval io_cache = ((float)buf_forwards) * 8 / bit_rate;
+            return io_cache + demux_cache;
+        }
+    }
+
+    return demux_cache;
 }
 
 - (CGSize)naturalSize
@@ -540,6 +598,12 @@ inline static int getPlayerOption(IJKFFOptionCategory category)
         self->_naturalSize = CGSizeMake(_videoWidth, _videoHeight);
     }
     [self didChangeValueForKey:@"naturalSize"];
+
+    if (self->_naturalSize.width > 0 && self->_naturalSize.height > 0) {
+        [[NSNotificationCenter defaultCenter]
+         postNotificationName:IJKMPMovieNaturalSizeAvailableNotification
+         object:self];
+    }
 }
 
 - (void)setScalingMode: (IJKMPMovieScalingMode) aScalingMode
@@ -584,6 +648,169 @@ inline static int getPlayerOption(IJKFFOptionCategory category)
 - (CGFloat)fpsAtOutput
 {
     return _glView.fps;
+}
+
+inline static NSString *formatedDurationMilli(int64_t duration) {
+    if (duration >=  1000) {
+        return [NSString stringWithFormat:@"%.2f sec", ((float)duration) / 1000];
+    } else {
+        return [NSString stringWithFormat:@"%ld msec", (long)duration];
+    }
+}
+
+inline static NSString *formatedDurationBytesAndBitrate(int64_t bytes, int64_t bitRate) {
+    if (bitRate <= 0) {
+        return @"inf";
+    }
+    return formatedDurationMilli(((float)bytes) * 8 * 1000 / bitRate);
+}
+
+inline static NSString *formatedSize(int64_t bytes) {
+    if (bytes >= 100 * 1000) {
+        return [NSString stringWithFormat:@"%.2f MB", ((float)bytes) / 1000 / 1000];
+    } else if (bytes >= 100) {
+        return [NSString stringWithFormat:@"%.1f KB", ((float)bytes) / 1000];
+    } else {
+        return [NSString stringWithFormat:@"%ld B", (long)bytes];
+    }
+}
+
+inline static NSString *formatedSpeed(int64_t bytes, int64_t elapsed_milli) {
+    if (elapsed_milli <= 0) {
+        return @"N/A";
+    }
+
+    if (bytes <= 0) {
+        return @"0";
+    }
+
+    float bytes_per_sec = ((float)bytes) * 1000.f /  elapsed_milli;
+    if (bytes_per_sec >= 1000 * 1000) {
+        return [NSString stringWithFormat:@"%.2f MB/s", ((float)bytes_per_sec) / 1000 / 1000];
+    } else if (bytes_per_sec >= 1000) {
+        return [NSString stringWithFormat:@"%.1f KB/s", ((float)bytes_per_sec) / 1000];
+    } else {
+        return [NSString stringWithFormat:@"%ld B/s", (long)bytes_per_sec];
+    }
+}
+
+- (void)refreshHudView
+{
+    if (_mediaPlayer == nil)
+        return;
+
+    int64_t vdec = ijkmp_get_property_int64(_mediaPlayer, FFP_PROP_INT64_VIDEO_DECODER, FFP_PROPV_DECODER_UNKNOWN);
+    float   vdps = ijkmp_get_property_float(_mediaPlayer, FFP_PROP_FLOAT_VIDEO_DECODE_FRAMES_PER_SECOND, .0f);
+    float   vfps = ijkmp_get_property_float(_mediaPlayer, FFP_PROP_FLOAT_VIDEO_OUTPUT_FRAMES_PER_SECOND, .0f);
+
+    switch (vdec) {
+        case FFP_PROPV_DECODER_VIDEOTOOLBOX:
+            [_glView setHudValue:@"VideoToolbox" forKey:@"vdec"];
+            break;
+        case FFP_PROPV_DECODER_AVCODEC:
+            [_glView setHudValue:[NSString stringWithFormat:@"avcodec %d.%d.%d",
+                                  LIBAVCODEC_VERSION_MAJOR,
+                                  LIBAVCODEC_VERSION_MINOR,
+                                  LIBAVCODEC_VERSION_MICRO]
+                          forKey:@"vdec"];
+            break;
+        default:
+            [_glView setHudValue:@"N/A" forKey:@"vdec"];
+            break;
+    }
+
+    [_glView setHudValue:[NSString stringWithFormat:@"%.2f / %.2f", vdps, vfps] forKey:@"fps"];
+
+    int64_t vcacheb = ijkmp_get_property_int64(_mediaPlayer, FFP_PROP_INT64_VIDEO_CACHED_BYTES, 0);
+    int64_t acacheb = ijkmp_get_property_int64(_mediaPlayer, FFP_PROP_INT64_AUDIO_CACHED_BYTES, 0);
+    int64_t vcached = ijkmp_get_property_int64(_mediaPlayer, FFP_PROP_INT64_VIDEO_CACHED_DURATION, 0);
+    int64_t acached = ijkmp_get_property_int64(_mediaPlayer, FFP_PROP_INT64_AUDIO_CACHED_DURATION, 0);
+    int64_t vcachep = ijkmp_get_property_int64(_mediaPlayer, FFP_PROP_INT64_VIDEO_CACHED_PACKETS, 0);
+    int64_t acachep = ijkmp_get_property_int64(_mediaPlayer, FFP_PROP_INT64_AUDIO_CACHED_PACKETS, 0);
+    [_glView setHudValue:[NSString stringWithFormat:@"%@, %@, %"PRId64" packets",
+                          formatedDurationMilli(vcached),
+                          formatedSize(vcacheb),
+                          vcachep]
+                  forKey:@"v-cache"];
+    [_glView setHudValue:[NSString stringWithFormat:@"%@, %@, %"PRId64" packets",
+                          formatedDurationMilli(acached),
+                          formatedSize(acacheb),
+                          acachep]
+                  forKey:@"a-cache"];
+
+    float avdelay = ijkmp_get_property_float(_mediaPlayer, FFP_PROP_FLOAT_AVDELAY, .0f);
+    float avdiff  = ijkmp_get_property_float(_mediaPlayer, FFP_PROP_FLOAT_AVDIFF, .0f);
+    [_glView setHudValue:[NSString stringWithFormat:@"%.3f %.3f", avdelay, -avdiff] forKey:@"delay"];
+
+    int64_t bitRate = ijkmp_get_property_int64(_mediaPlayer, FFP_PROP_INT64_BIT_RATE, 0);
+    [_glView setHudValue:[NSString stringWithFormat:@"-%@, %@",
+                          formatedSize(_asyncStat.buf_backwards),
+                          formatedDurationBytesAndBitrate(_asyncStat.buf_backwards, bitRate)]
+                  forKey:@"async-backward"];
+    [_glView setHudValue:[NSString stringWithFormat:@"+%@, %@",
+                          formatedSize(_asyncStat.buf_forwards),
+                          formatedDurationBytesAndBitrate(_asyncStat.buf_forwards, bitRate)]
+                  forKey:@"async-forward"];
+
+    [_glView setHudValue:[NSString stringWithFormat:@"%@, %@",
+                          formatedSpeed(_asyncReadSpeedStartup.io_bytes, _asyncReadSpeedStartup.elapsed_milli),
+                          formatedSpeed(_asyncReadSpeed.io_bytes, _asyncReadSpeed.elapsed_milli)]
+                  forKey:@"async-speed"];
+}
+
+- (void)startHudTimer
+{
+    if (!_shouldShowHudView)
+        return;
+
+    if (_hudTimer != nil)
+        return;
+
+    if ([[NSThread currentThread] isMainThread]) {
+        _glView.shouldShowHudView = YES;
+        _hudTimer = [NSTimer scheduledTimerWithTimeInterval:.5f
+                                                     target:self
+                                                   selector:@selector(refreshHudView)
+                                                   userInfo:nil
+                                                    repeats:YES];
+    } else {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self startHudTimer];
+        });
+    }
+}
+
+- (void)stopHudTimer
+{
+    if (_hudTimer == nil)
+        return;
+
+    if ([[NSThread currentThread] isMainThread]) {
+        _glView.shouldShowHudView = NO;
+        [_hudTimer invalidate];
+        _hudTimer = nil;
+    } else {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self stopHudTimer];
+        });
+    }
+}
+
+- (void)setShouldShowHudView:(BOOL)shouldShowHudView
+{
+    if (shouldShowHudView == _shouldShowHudView) {
+        return;
+    }
+    _shouldShowHudView = shouldShowHudView;
+    if (shouldShowHudView)
+        [self startHudTimer];
+    else
+        [self stopHudTimer];
+}
+
+- (BOOL)shouldShowHudView
+{
+    return _shouldShowHudView;
 }
 
 - (void)setPlaybackRate:(float)playbackRate
@@ -722,6 +949,7 @@ inline static void fillMetaInternal(NSMutableDictionary *meta, IjkMediaMeta *raw
                 _mediaMeta = newMediaMeta;
             }
 
+            [self startHudTimer];
             _isPreparedToPlay = YES;
 
             [[NSNotificationCenter defaultCenter] postNotificationName:IJKMPMediaPlaybackIsPreparedToPlayDidChangeNotification object:self];
@@ -878,115 +1106,69 @@ int media_player_msg_loop(void* arg)
 
 #pragma mark av_format_control_message
 
-int onInjectConcatResolveSegment(IJKFFMoviePlayerController *mpc, int type, void *data, size_t data_size)
+static int onInjectUrlOpen(IJKFFMoviePlayerController *mpc, id<IJKMediaUrlOpenDelegate> delegate, int type, void *data, size_t data_size)
 {
-    if (mpc == nil)
-        return -1;
-
     IJKAVInject_OnUrlOpenData *realData = data;
-    if (realData == NULL || sizeof(IJKAVInject_OnUrlOpenData) != data_size) {
-        NSLog(@"onInjectConcatResolveSegment: invalid call\n");
-        return -1;
-    }
+    assert(realData);
+    assert(sizeof(IJKAVInject_OnUrlOpenData) == data_size);
+    realData->is_handled     = NO;
+    realData->is_url_changed = NO;
 
-    NSString *url = [mpc->_segmentResolver urlOfSegment:realData->segment_index];
-    if (url == nil)
-        return -1;
-
-    const char *rawUrl = [url UTF8String];
-    if (rawUrl == NULL)
-        return -1;
-
-    strlcpy(realData->url, rawUrl, sizeof(realData->url));
-    realData->url[sizeof(realData->url) - 1] = 0;
-    return 0;
-}
-
-static int onInjectTcpOpen(IJKFFMoviePlayerController *mpc, int type, void *data, size_t data_size)
-{
-    if (mpc == nil)
-        return -1;
-
-    IJKAVInject_OnUrlOpenData *realData = data;
-    if (realData == NULL || sizeof(IJKAVInject_OnUrlOpenData) != data_size) {
-        NSLog(@"onInjectTcpOpen: invalid call\n");
-        return -1;
-    }
-
-    // no retry
-    if (mpc.tcpOpenDelegate == nil)
+    if (delegate == nil)
         return 0;
 
-    NSString *url = [NSString stringWithUTF8String:realData->url];
-    NSString *newUrl = [mpc.tcpOpenDelegate onTcpOpen:realData->segment_index url:url];
-    if (newUrl == nil)
-        return -1;
-
-    if (newUrl != url) {
-        const char *newUrlUTF8 = [newUrl UTF8String];
-        strlcpy(realData->url, newUrlUTF8, sizeof(realData->url));
-        realData->url[sizeof(realData->url) - 1] = 0;
+    NSString *urlString = [NSString stringWithUTF8String:realData->url];
+    NSURL *url = [NSURL URLWithString:urlString];
+    if ([url.scheme isEqualToString:@"tcp"] || [url.scheme isEqualToString:@"udp"]) {
+        if ([url.host ijk_isIpv4]) {
+            [mpc->_glView setHudValue:url.host forKey:@"ip"];
+        }
+    } else {
+        [mpc setHudUrl:urlString];
     }
 
-    return 0;
-}
+    IJKMediaUrlOpenData *openData =
+    [[IJKMediaUrlOpenData alloc] initWithUrl:urlString
+                                    openType:(IJKMediaUrlOpenType)type
+                                segmentIndex:realData->segment_index
+                                retryCounter:realData->retry_counter];
 
-static int onInjectHttpOpen(IJKFFMoviePlayerController *mpc, int type, void *data, size_t data_size)
-{
-    if (mpc == nil)
+    [delegate willOpenUrl:openData];
+    if (openData.error < 0)
         return -1;
 
-    IJKAVInject_OnUrlOpenData *realData = data;
-    if (realData == NULL || sizeof(IJKAVInject_OnUrlOpenData) != data_size) {
-        NSLog(@"onInjectHttpOpen: invalid call\n");
-        return -1;
-    }
-
-    // no retry
-    if (mpc.httpOpenDelegate == nil)
-        return 0;
-
-    NSString *url = [NSString stringWithUTF8String:realData->url];
-    NSString *newUrl = [mpc.httpOpenDelegate onHttpOpen:realData->segment_index url:url];
-    if (newUrl == nil)
-        return -1;
-
-    if (newUrl != url) {
-        const char *newUrlUTF8 = [newUrl UTF8String];
-        strlcpy(realData->url, newUrlUTF8, sizeof(realData->url));
-        realData->url[sizeof(realData->url) - 1] = 0;
+    if (openData.isHandled) {
+        realData->is_handled = YES;
+        if (openData.isUrlChanged && openData.url != nil) {
+            realData->is_url_changed = YES;
+            const char *newUrlUTF8 = [openData.url UTF8String];
+            strlcpy(realData->url, newUrlUTF8, sizeof(realData->url));
+            realData->url[sizeof(realData->url) - 1] = 0;
+        }
     }
     
     return 0;
 }
 
-
-static int onInjectLiveRetry(IJKFFMoviePlayerController *mpc, int type, void *data, size_t data_size)
+static int onInjectAsyncStatistic(IJKFFMoviePlayerController *mpc, int type, void *data, size_t data_size)
 {
-    if (mpc == nil)
-        return -1;
+    IJKAVInject_AsyncStatistic *realData = data;
+    assert(realData);
+    assert(sizeof(IJKAVInject_AsyncStatistic) == data_size);
 
-    IJKAVInject_OnUrlOpenData *realData = data;
-    if (realData == NULL || sizeof(IJKAVInject_OnUrlOpenData) != data_size) {
-        NSLog(@"onInjectHttpRetry: invalid call\n");
-        return -1;
-    }
+    mpc->_asyncStat = *realData;
+    return 0;
+}
 
-    // always try first time
-    if (mpc.liveRetryDelegate == nil)
-        return realData->retry_counter ? -1 : 0;
+static int onInjectReadSpeed(IJKFFMoviePlayerController *mpc, int type, void *data, size_t data_size)
+{
+    IJKAVInject_AsyncReadSpeed *realData = data;
+    assert(realData);
+    assert(sizeof(IJKAVInject_AsyncReadSpeed) == data_size);
 
-    NSString *url = [NSString stringWithUTF8String:realData->url];
-    NSString *newUrl = [mpc.liveRetryDelegate onLiveRetry:realData->segment_index
-                                                      url:url
-                                               retryCount:realData->retry_counter];
-    if (newUrl == nil)
-        return -1;
-
-    if (newUrl != url) {
-        const char *newUrlUTF8 = [newUrl UTF8String];
-        strlcpy(realData->url, newUrlUTF8, sizeof(realData->url));
-        realData->url[sizeof(realData->url) - 1] = 0;
+    mpc->_asyncReadSpeed = *realData;
+    if (mpc->_asyncReadSpeedStartup.elapsed_milli == 0 && realData->is_full_speed) {
+        mpc->_asyncReadSpeedStartup = *realData;
     }
 
     return 0;
@@ -999,15 +1181,19 @@ static int ijkff_inject_callback(void *opaque, int message, void *data, size_t d
 
     switch (message) {
         case IJKAVINJECT_CONCAT_RESOLVE_SEGMENT:
-            return onInjectConcatResolveSegment(mpc, message, data, data_size);
+            return onInjectUrlOpen(mpc, mpc.segmentOpenDelegate, message, data, data_size);
         case IJKAVINJECT_ON_TCP_OPEN:
-            return onInjectTcpOpen(mpc, message, data, data_size);
+            return onInjectUrlOpen(mpc, mpc.tcpOpenDelegate, message, data, data_size);
         case IJKAVINJECT_ON_HTTP_OPEN:
-            return onInjectHttpOpen(mpc, message, data, data_size);
+            return onInjectUrlOpen(mpc, mpc.httpOpenDelegate, message, data, data_size);
         case IJKAVINJECT_ON_LIVE_RETRY:
-            return onInjectLiveRetry(mpc, message, data, data_size);
+            return onInjectUrlOpen(mpc, mpc.liveOpenDelegate, message, data, data_size);
+        case IJKAVINJECT_ASYNC_STATISTIC:
+            return onInjectAsyncStatistic(mpc, message, data, data_size);
+        case IJKAVINJECT_ASYNC_READ_SPEED:
+            return onInjectReadSpeed(mpc, message, data, data_size);
         default: {
-            return -1;
+            return 0;
         }
     }
 }

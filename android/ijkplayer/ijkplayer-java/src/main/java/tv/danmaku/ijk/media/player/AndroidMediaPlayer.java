@@ -39,15 +39,13 @@ import tv.danmaku.ijk.media.player.misc.ITrackInfo;
 import tv.danmaku.ijk.media.player.pragma.DebugLog;
 
 public class AndroidMediaPlayer extends AbstractMediaPlayer {
-    private MediaPlayer mInternalMediaPlayer;
-    private AndroidMediaPlayerListenerHolder mInternalListenerAdapter;
+    private final MediaPlayer mInternalMediaPlayer;
+    private final AndroidMediaPlayerListenerHolder mInternalListenerAdapter;
     private String mDataSource;
     private MediaDataSource mMediaDataSource;
 
-    private Object mInitLock = new Object();
+    private final Object mInitLock = new Object();
     private boolean mIsReleased;
-
-    private boolean mKeepInBackground;
 
     private static MediaInfo sMediaInfo;
 
@@ -123,7 +121,7 @@ public class AndroidMediaPlayer extends AbstractMediaPlayer {
 
     @TargetApi(Build.VERSION_CODES.M)
     private static class MediaDataSourceProxy extends MediaDataSource {
-        private IMediaDataSource mMediaDataSource;
+        private final IMediaDataSource mMediaDataSource;
 
         public MediaDataSourceProxy(IMediaDataSource mediaDataSource) {
             mMediaDataSource = mediaDataSource;
@@ -328,7 +326,6 @@ public class AndroidMediaPlayer extends AbstractMediaPlayer {
 
     @Override
     public void setKeepInBackground(boolean keepInBackground) {
-        mKeepInBackground = keepInBackground;
     }
 
     /*--------------------
@@ -353,7 +350,7 @@ public class AndroidMediaPlayer extends AbstractMediaPlayer {
             MediaPlayer.OnSeekCompleteListener,
             MediaPlayer.OnVideoSizeChangedListener,
             MediaPlayer.OnErrorListener, MediaPlayer.OnInfoListener {
-        public WeakReference<AndroidMediaPlayer> mWeakMediaPlayer;
+        public final WeakReference<AndroidMediaPlayer> mWeakMediaPlayer;
 
         public AndroidMediaPlayerListenerHolder(AndroidMediaPlayer mp) {
             mWeakMediaPlayer = new WeakReference<AndroidMediaPlayer>(mp);
@@ -362,19 +359,15 @@ public class AndroidMediaPlayer extends AbstractMediaPlayer {
         @Override
         public boolean onInfo(MediaPlayer mp, int what, int extra) {
             AndroidMediaPlayer self = mWeakMediaPlayer.get();
-            if (self == null)
-                return false;
+            return self != null && notifyOnInfo(what, extra);
 
-            return notifyOnInfo(what, extra);
         }
 
         @Override
         public boolean onError(MediaPlayer mp, int what, int extra) {
             AndroidMediaPlayer self = mWeakMediaPlayer.get();
-            if (self == null)
-                return false;
+            return self != null && notifyOnError(what, extra);
 
-            return notifyOnError(what, extra);
         }
 
         @Override

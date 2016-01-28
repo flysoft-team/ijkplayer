@@ -18,6 +18,7 @@ package tv.danmaku.ijk.media.player;
 
 import tv.danmaku.ijk.media.player.misc.IMediaDataSource;
 
+@SuppressWarnings("WeakerAccess")
 public abstract class AbstractMediaPlayer implements IMediaPlayer {
     private OnPreparedListener mOnPreparedListener;
     private OnCompletionListener mOnCompletionListener;
@@ -95,15 +96,11 @@ public abstract class AbstractMediaPlayer implements IMediaPlayer {
     }
 
     protected final boolean notifyOnError(int what, int extra) {
-        if (mOnErrorListener != null)
-            return mOnErrorListener.onError(this, what, extra);
-        return false;
+        return mOnErrorListener != null && mOnErrorListener.onError(this, what, extra);
     }
 
     protected final boolean notifyOnInfo(int what, int extra) {
-        if (mOnInfoListener != null)
-            return mOnInfoListener.onInfo(this, what, extra);
-        return false;
+        return mOnInfoListener != null && mOnInfoListener.onInfo(this, what, extra);
     }
 
     public void setDataSource(IMediaDataSource mediaDataSource) {

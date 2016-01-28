@@ -108,6 +108,19 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
 
     public static final int FFP_PROP_INT64_SELECTED_VIDEO_STREAM      = 20001;
     public static final int FFP_PROP_INT64_SELECTED_AUDIO_STREAM      = 20002;
+
+    public static final int FFP_PROP_INT64_VIDEO_DECODER              = 20003;
+    public static final int FFP_PROP_INT64_AUDIO_DECODER              = 20004;
+    public static final int     FFP_PROPV_DECODER_UNKNOWN             = 0;
+    public static final int     FFP_PROPV_DECODER_AVCODEC             = 1;
+    public static final int     FFP_PROPV_DECODER_MEDIACODEC          = 2;
+    public static final int     FFP_PROPV_DECODER_VIDEOTOOLBOX        = 3;
+    public static final int FFP_PROP_INT64_VIDEO_CACHED_DURATION      = 20005;
+    public static final int FFP_PROP_INT64_AUDIO_CACHED_DURATION      = 20006;
+    public static final int FFP_PROP_INT64_VIDEO_CACHED_BYTES         = 20007;
+    public static final int FFP_PROP_INT64_AUDIO_CACHED_BYTES         = 20008;
+    public static final int FFP_PROP_INT64_VIDEO_CACHED_PACKETS       = 20009;
+    public static final int FFP_PROP_INT64_AUDIO_CACHED_PACKETS       = 20010;
     //----------------------------------------
 
     @AccessedByNative
@@ -138,7 +151,7 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
      * Default library loader
      * Load them by yourself, if your libraries are not installed at default place.
      */
-    private static IjkLibLoader sLocalLibLoader = new IjkLibLoader() {
+    private static final IjkLibLoader sLocalLibLoader = new IjkLibLoader() {
         @Override
         public void loadLibrary(String libName) throws UnsatisfiedLinkError, SecurityException {
             System.loadLibrary(libName);
@@ -333,8 +346,8 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
                 setDataSource(fd.getFileDescriptor(), fd.getStartOffset(), fd.getDeclaredLength());
             }
             return;
-        } catch (SecurityException ex) {
-        } catch (IOException ex) {
+        } catch (SecurityException ignored) {
+        } catch (IOException ignored) {
         } finally {
             if (fd != null) {
                 fd.close();
@@ -389,6 +402,7 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
                 if (!TextUtils.isEmpty(value))
                     sb.append(entry.getValue());
                 sb.append("\r\n");
+                setOption(OPT_CATEGORY_FORMAT, "headers", sb.toString());
             }
         }
         setDataSource(path);
@@ -694,12 +708,50 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
 
     private native int _getLoopCount();
 
+    @TargetApi(Build.VERSION_CODES.M)
+    public void setSpeed(float speed) {
+        _setPropertyFloat(FFP_PROP_FLOAT_PLAYBACK_RATE, speed);
+    }
+
+    @TargetApi(Build.VERSION_CODES.M)
+    public float getSpeed(float speed) {
+        return _getPropertyFloat(FFP_PROP_FLOAT_PLAYBACK_RATE, .0f);
+    }
+
+    public int getVideoDecoder() {
+        return (int)_getPropertyLong(FFP_PROP_INT64_VIDEO_DECODER, FFP_PROPV_DECODER_UNKNOWN);
+    }
+
     public float getVideoOutputFramesPerSecond() {
         return _getPropertyFloat(PROP_FLOAT_VIDEO_OUTPUT_FRAMES_PER_SECOND, 0.0f);
     }
 
     public float getVideoDecodeFramesPerSecond() {
         return _getPropertyFloat(PROP_FLOAT_VIDEO_DECODE_FRAMES_PER_SECOND, 0.0f);
+    }
+
+    public long getVideoCachedDuration() {
+        return _getPropertyLong(FFP_PROP_INT64_VIDEO_CACHED_DURATION, 0);
+    }
+
+    public long getAudioCachedDuration() {
+        return _getPropertyLong(FFP_PROP_INT64_AUDIO_CACHED_DURATION, 0);
+    }
+
+    public long getVideoCachedBytes() {
+        return _getPropertyLong(FFP_PROP_INT64_VIDEO_CACHED_BYTES, 0);
+    }
+
+    public long getAudioCachedBytes() {
+        return _getPropertyLong(FFP_PROP_INT64_AUDIO_CACHED_BYTES, 0);
+    }
+
+    public long getVideoCachedPackets() {
+        return _getPropertyLong(FFP_PROP_INT64_VIDEO_CACHED_PACKETS, 0);
+    }
+
+    public long getAudioCachedPackets() {
+        return _getPropertyLong(FFP_PROP_INT64_AUDIO_CACHED_PACKETS, 0);
     }
 
     private native float _getPropertyFloat(int property, float defaultValue);
@@ -805,12 +857,13 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
 
     private native void native_message_loop(Object IjkMediaPlayer_this);
 
-    protected void finalize() {
+    protected void finalize() throws Throwable {
+        super.finalize();
         native_finalize();
     }
 
     private static class EventHandler extends Handler {
-        private WeakReference<IjkMediaPlayer> mWeakPlayer;
+        private final WeakReference<IjkMediaPlayer> mWeakPlayer;
 
         public EventHandler(IjkMediaPlayer mp, Looper looper) {
             super(looper);
@@ -832,8 +885,8 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
                 return;
 
             case MEDIA_PLAYBACK_COMPLETE:
-                player.notifyOnCompletion();
                 player.stayAwake(false);
+                player.notifyOnCompletion();
                 return;
 
             case MEDIA_BUFFERING_UPDATE:
@@ -899,7 +952,6 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
 
             default:
                 DebugLog.e(TAG, "Unknown message type " + msg.what);
-                return;
             }
         }
     }
@@ -943,8 +995,8 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
         mOnControlMessageListener = listener;
     }
 
-    public static interface OnControlMessageListener {
-        public String onControlResolveSegmentUrl(int segment);
+    public interface OnControlMessageListener {
+        String onControlResolveSegmentUrl(int segment);
     }
 
     /*
@@ -1016,8 +1068,8 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
      * MediaCodec select
      */
 
-    public static interface OnMediaCodecSelectListener {
-        public String onMediaCodecSelect(IMediaPlayer mp, String mimeType, int profile, int level);
+    public interface OnMediaCodecSelectListener {
+        String onMediaCodecSelect(IMediaPlayer mp, String mimeType, int profile, int level);
     }
     private OnMediaCodecSelectListener mOnMediaCodecSelectListener;
     public void setOnMediaCodecSelectListener(OnMediaCodecSelectListener listener) {
@@ -1048,7 +1100,7 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
     }
 
     public static class DefaultMediaCodecSelector implements OnMediaCodecSelectListener {
-        public static DefaultMediaCodecSelector sInstance = new DefaultMediaCodecSelector();
+        public static final DefaultMediaCodecSelector sInstance = new DefaultMediaCodecSelector();
 
         @SuppressWarnings("deprecation")
         @TargetApi(Build.VERSION_CODES.JELLY_BEAN)
