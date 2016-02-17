@@ -291,8 +291,14 @@ FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-pic"
 # FF_CFG_FLAGS="$FF_CFG_FLAGS --disable-symver"
 
 # Optimization options (experts only):
+if [ "$FF_ARCH" = "x86" ]; then
+FF_CFG_FLAGS="$FF_CFG_FLAGS --disable-asm"
+FF_CFG_FLAGS="$FF_CFG_FLAGS --disable-inline-asm"
+else
 FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-asm"
 FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-inline-asm"
+
+fi
 
 #--------------------
 echo ""
