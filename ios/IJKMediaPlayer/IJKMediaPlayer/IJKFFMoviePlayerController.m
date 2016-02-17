@@ -197,8 +197,7 @@ void IJKFFIOStatCompleteRegister(void (*cb)(const char *url,
         ijkmp_set_option_int(_mediaPlayer, IJKMP_OPT_CATEGORY_PLAYER, "start-on-prepared", _shouldAutoplay ? 1 : 0);
 
         // init video sink
-        _glView = [[IJKSDLGLView alloc] initWithFrame:[[UIScreen mainScreen] bounds]
-                                       useRenderQueue:options.useRenderQueue];
+        _glView = [[IJKSDLGLView alloc] initWithFrame:[[UIScreen mainScreen] bounds]];
         _glView.shouldShowHudView = NO;
         _view   = _glView;
         [_glView setHudValue:nil forKey:@"scheme"];
@@ -209,7 +208,7 @@ void IJKFFIOStatCompleteRegister(void (*cb)(const char *url,
         self.shouldShowHudView = options.showHudView;
 
         ijkmp_ios_set_glview(_mediaPlayer, _glView);
-        ijkmp_set_option(_mediaPlayer, IJKMP_OPT_CATEGORY_PLAYER, "overlay-format", "fcc-i420");
+        ijkmp_set_option(_mediaPlayer, IJKMP_OPT_CATEGORY_PLAYER, "overlay-format", "fcc-_es2");
 #ifdef DEBUG
         [IJKFFMoviePlayerController setLogLevel:k_IJK_LOG_DEBUG];
 #else

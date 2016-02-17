@@ -1,10 +1,14 @@
 tag next
 --------------------------------
+
+tag k0.4.5
+--------------------------------
 - ios: support playbackRate change. (iOS 7.0 or later)
 - android: support speed change. (Android 6.0 or later)
 - player: do not link avfilter by default.
 - android: add x86_64 support
 - android: move jjk out to jni4android project
+- android: support OpenGL ES2 render
 
 tag k0.4.4
 --------------------------------

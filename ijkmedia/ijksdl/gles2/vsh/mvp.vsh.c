@@ -1,9 +1,5 @@
 /*
- * IJKSDLGLRenderI444P10LE.h
- *
- * Copyright (c) 2015 Zhang Rui <bbcallen@gmail.com>
- *
- * based on https://github.com/kolyvan/kxmovie
+ * copyright (c) 2016 Zhang Rui <bbcallen@gmail.com>
  *
  * This file is part of ijkPlayer.
  *
@@ -22,9 +18,23 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#import <Foundation/Foundation.h>
-#import "IJKSDLGLRender.h"
+#include "ijksdl/gles2/internal.h"
 
-@interface IJKSDLGLRenderI444P10LE : NSObject<IJKSDLGLRender>
+static const char g_shader[] = IJK_GLES_STRING(
+    precision highp float;
+    varying   highp vec2 vv2_Texcoord;
+    attribute highp vec4 av4_Position;
+    attribute highp vec2 av2_Texcoord;
+    uniform         mat4 um4_ModelViewProjection;
 
-@end
+    void main()
+    {
+        gl_Position  = um4_ModelViewProjection * av4_Position;
+        vv2_Texcoord = av2_Texcoord.xy;
+    }
+);
+
+const char *IJK_GLES2_getVertexShader_default()
+{
+    return g_shader;
+}

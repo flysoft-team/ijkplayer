@@ -85,10 +85,8 @@ static const AVOption ffp_context_options[] = {
     { "overlay-format",                 "fourcc of overlay format",
         OPTION_OFFSET(overlay_format),  OPTION_INT(SDL_FCC_RV32, INT_MIN, INT_MAX),
         .unit = "overlay-format" },
+    { "fcc-_es2",                       "", 0, OPTION_CONST(SDL_FCC__GLES2), .unit = "overlay-format" },
     { "fcc-i420",                       "", 0, OPTION_CONST(SDL_FCC_I420), .unit = "overlay-format" },
-#ifdef __APPLE__
-    { "fcc-i4al",                       "", 0, OPTION_CONST(SDL_FCC_I444P10LE), .unit = "overlay-format" },
-#endif
     { "fcc-yv12",                       "", 0, OPTION_CONST(SDL_FCC_YV12), .unit = "overlay-format" },
     { "fcc-rv16",                       "", 0, OPTION_CONST(SDL_FCC_RV16), .unit = "overlay-format" },
     { "fcc-rv24",                       "", 0, OPTION_CONST(SDL_FCC_RV24), .unit = "overlay-format" },
@@ -153,7 +151,8 @@ static const AVOption ffp_context_options[] = {
         OPTION_OFFSET(mediacodec_avc),          OPTION_INT(0, 0, 1) },
     { "mediacodec-hevc",                        "MediaCodec: enable HEVC",
         OPTION_OFFSET(mediacodec_hevc),         OPTION_INT(0, 0, 1) },
-
+    { "mediacodec-mpeg2",                       "MediaCodec: enable MPEG2VIDEO",
+        OPTION_OFFSET(mediacodec_mpeg2),        OPTION_INT(0, 0, 1) },
     { "opensles",                           "OpenSL ES: enable",
         OPTION_OFFSET(opensles),            OPTION_INT(0, 0, 1) },
     

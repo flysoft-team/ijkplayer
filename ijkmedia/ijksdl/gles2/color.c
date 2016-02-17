@@ -1,9 +1,5 @@
 /*
- * IJKSDLGLRender.h
- *
- * Copyright (c) 2013 Zhang Rui <bbcallen@gmail.com>
- *
- * based on https://github.com/kolyvan/kxmovie
+ * copyright (c) 2016 Zhang Rui <bbcallen@gmail.com>
  *
  * This file is part of ijkPlayer.
  *
@@ -22,30 +18,25 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#import <Foundation/Foundation.h>
-#include <OpenGLES/ES2/gl.h>
-#include <OpenGLES/ES2/glext.h>
-
-#include "ijksdl/ijksdl_vout.h"
-
-@protocol IJKSDLGLRender
-- (BOOL) isValid;
-- (NSString *) fragmentShader;
-- (void) resolveUniforms: (GLuint) program;
-- (void) render: (SDL_VoutOverlay *) overlay;
-- (BOOL) prepareDisplay;
-@end
+#include "internal.h"
 
 // BT.709, which is the standard for HDTV.
-static const GLfloat kColorConversion709[] = {
+static const GLfloat g_bt709[] = {
     1.164,  1.164,  1.164,
     0.0,   -0.213,  2.112,
     1.793, -0.533,  0.0,
 };
+const GLfloat *IJK_GLES2_getColorMatrix_bt709()
+{
+    return g_bt709;
+}
 
-// BT.601, which is the standard for SDTV.
-static const GLfloat kColorConversion601[] = {
+static const GLfloat g_bt601[] = {
     1.164,  1.164, 1.164,
     0.0,   -0.392, 2.017,
-    1.596, -0.813,   0.0,
+    1.596, -0.813, 0.0,
 };
+const GLfloat *IJK_GLES2_getColorMatrix_bt601()
+{
+    return g_bt601;
+}
