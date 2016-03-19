@@ -405,7 +405,7 @@ static int feed_input_buffer(JNIEnv *env, IJKFF_Pipenode *node, int64_t timeUs, 
             ffpipeline_set_surface_need_reconfigure_l(pipeline, false);
             new_surface = ffpipeline_get_surface_as_global_ref_l(env, pipeline);
             ffpipeline_unlock_surface(pipeline);
-
+            if (new_surface != NULL){
             if (opaque->jsurface == new_surface ||
                 (opaque->jsurface && new_surface && (*env)->IsSameObject(env, new_surface, opaque->jsurface))) {
                 ALOGI("%s: same surface, reuse previous surface\n", __func__);
@@ -439,6 +439,7 @@ static int feed_input_buffer(JNIEnv *env, IJKFF_Pipenode *node, int64_t timeUs, 
                     ret = 0;
                     goto fail;
                 }
+            }
             }
         }
 
