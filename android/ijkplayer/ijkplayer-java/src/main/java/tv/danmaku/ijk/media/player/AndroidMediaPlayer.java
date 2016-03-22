@@ -254,6 +254,11 @@ public class AndroidMediaPlayer extends AbstractMediaPlayer {
     }
 
     @Override
+    public void destroy() {
+        release();
+    }
+
+    @Override
     public void reset() {
         try {
             mInternalMediaPlayer.reset();

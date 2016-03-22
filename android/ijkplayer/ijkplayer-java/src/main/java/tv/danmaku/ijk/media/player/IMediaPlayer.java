@@ -102,6 +102,8 @@ public interface IMediaPlayer {
 
     void reset();
 
+    void destroy();
+
     void setVolume(float leftVolume, float rightVolume);
 
     int getAudioSessionId();

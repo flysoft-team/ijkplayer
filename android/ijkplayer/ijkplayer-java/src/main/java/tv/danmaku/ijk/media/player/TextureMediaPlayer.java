@@ -58,6 +58,12 @@ public class TextureMediaPlayer extends MediaPlayerProxy implements IMediaPlayer
     }
 
     @Override
+    public void destroy() {
+        super.destroy();
+        releaseSurfaceTexture();
+    }
+
+    @Override
     public void setDisplay(SurfaceHolder sh) {
         if (mSurfaceTexture == null)
             super.setDisplay(sh);

@@ -152,6 +152,11 @@ public class MediaPlayerProxy implements IMediaPlayer {
     }
 
     @Override
+    public void destroy() {
+        mBackEndMediaPlayer.destroy();
+    }
+
+    @Override
     public void setVolume(float leftVolume, float rightVolume) {
         mBackEndMediaPlayer.setVolume(leftVolume, rightVolume);
     }
