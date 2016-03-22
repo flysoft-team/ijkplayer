@@ -860,7 +860,7 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
 	@Override
     public void destroy(){
         release();
-        native_finalize();
+//        native_finalize();
     }
 
 
