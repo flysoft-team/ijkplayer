@@ -26,14 +26,3 @@ android {
 dependencies {
     compile fileTree(dir: 'libs', include: ['*.jar'])
 }
-
-ext {
-    optionalPlugins = ['tools/gradle-mvn-push.gradle', 'tools/gradle-bintray-upload.gradle'];
-}
-
-ext.optionalPlugins.each{ value ->
-    def plugin_file = new File(rootProject.projectDir, value);
-    if (plugin_file.exists()) {
-        apply from: plugin_file
-    }
-}
