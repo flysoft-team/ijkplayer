@@ -37,5 +37,3 @@ ext.optionalPlugins.each { value ->
 	}
 }
 
-apply from: new File(rootProject.projectDir, "tools/gradle-on-demand.gradle");
-
