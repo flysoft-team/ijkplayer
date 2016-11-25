@@ -194,7 +194,7 @@ esac
 
 
 mkdir -p $FF_PREFIX
-mkdir -p $FF_SYSROOT
+# mkdir -p $FF_SYSROOT
 
 
 FF_TOOLCHAIN_TOUCH="$FF_TOOLCHAIN_PATH/touch"
@@ -271,14 +271,13 @@ FF_CFG_FLAGS="$FF_CFG_FLAGS --target-os=linux"
 FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-pic"
 # FF_CFG_FLAGS="$FF_CFG_FLAGS --disable-symver"
 
-# Optimization options (experts only):
 if [ "$FF_ARCH" = "x86" ]; then
-FF_CFG_FLAGS="$FF_CFG_FLAGS --disable-asm"
-FF_CFG_FLAGS="$FF_CFG_FLAGS --disable-inline-asm"
+    FF_CFG_FLAGS="$FF_CFG_FLAGS --disable-asm"
+    FF_CFG_FLAGS="$FF_CFG_FLAGS --disable-inline-asm"
 else
-FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-asm"
-FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-inline-asm"
-
+    # Optimization options (experts only):
+    FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-asm"
+    FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-inline-asm"
 fi
 
 case "$FF_BUILD_OPT" in
