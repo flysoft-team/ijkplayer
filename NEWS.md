@@ -1,6 +1,36 @@
 tag next
 --------------------------------
 
+tag k0.7.5
+--------------------------------
+- ffmpeg: disable-asm on architecture x86
+- ffmpeg: revert some cutted demuxer and decoder
+- ios: add playback volume interface
+
+tag k0.7.4
+--------------------------------
+- ffplay: fix sample buffer leak introduced in k0.7.1
+- doc: add takeoff checklist
+
+tag k0.7.3
+--------------------------------
+- ios: turn videotoolbox into singleton
+- ffmpeg: merge ipv6 issue in tcp.c
+
+tag k0.7.2
+-------------------------------
+- ios: fix a compile error
+
+tag k0.7.1
+-------------------------------
+- ffmpeg: upgrade to n3.2
+
+tag k0.6.3
+--------------------------------
+- ffmpeg: disable clock_gettime added in xcode8
+- android: make NDKr13 happy
+
+>>>>>>> 7f479bf4f0e551df347d1f6adf8fd406b91612af
 tag k0.6.2
 --------------------------------
 - ffmpeg: fix wild pointer when decoder was not found
