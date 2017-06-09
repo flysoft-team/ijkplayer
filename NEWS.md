@@ -1,6 +1,40 @@
 tag next
 --------------------------------
 
+tag k0.8.0
+--------------------------------
+- ffmpeg: upgrade to 3.3
+- ffmpeg: enable flac
+- android: support sync mediacodec
+- android: support framedrop when use mediacodec
+- openssl: upgrade to 1.0.2k
+- jni4android: upgrade to v0.0.2
+
+tag k0.7.9
+--------------------------------
+- ffmpeg: add tcp timeout control
+- android: support soundtouch
+
+tag k0.7.8
+--------------------------------
+- ffplay: support accurate seek
+- ijkio: fix some issue
+- ios: add ijkplayer dynamic target with ssl
+
+tag k0.7.7
+--------------------------------
+- ffmpeg: enable ijkio protocol
+- ffmpeg: avoid some unreasonable pts
+- ios: fix a crash caused by videotoolbox sync initialization fail
+
+tag k0.7.6
+--------------------------------
+- ffmpeg: ass subtitle support
+- msg_queue: add resource for msg_queue
+- ios: separate vtb sync mode from mixed vtb
+- android: fix some thread competition
+- android: support setSpeed for pre-M(api<23) versions
+
 tag k0.7.5
 --------------------------------
 - ffmpeg: disable-asm on architecture x86
