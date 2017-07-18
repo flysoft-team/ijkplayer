@@ -154,10 +154,10 @@ cd ..
 #
 #     define ext block in your root build.gradle
 #     ext {
-#       compileSdkVersion = 23       // depending on your sdk version
-#       buildToolsVersion = "23.0.0" // depending on your build tools version
+#       compileSdkVersion = 25       // depending on your sdk version
+#       buildToolsVersion = "26.0.0" // depending on your build tools version
 #
-#       targetSdkVersion = 23        // depending on your sdk version
+#       targetSdkVersion = 25       // depending on your sdk version
 #     }
 #
 # If you want to enable debugging ijkplayer(native modules) on Android Studio 2.2+: (experimental)
