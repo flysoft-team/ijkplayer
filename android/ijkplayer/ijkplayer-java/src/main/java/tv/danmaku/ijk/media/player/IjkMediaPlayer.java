@@ -553,7 +553,7 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
             mWakeLock = null;
         }
 
-        PowerManager pm = (PowerManager) context
+        PowerManager pm = (PowerManager) context.getApplicationContext()
                 .getSystemService(Context.POWER_SERVICE);
         mWakeLock = pm.newWakeLock(mode | PowerManager.ON_AFTER_RELEASE,
                 IjkMediaPlayer.class.getName());
