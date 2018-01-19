@@ -22,12 +22,12 @@ allprojects {
 
 ext {
 	compileSdkVersion = 26
-	buildToolsVersion = "26.0.2"
+	buildToolsVersion = "27.0.3"
 
 	targetSdkVersion = 26
 
-    versionCode = 800102
-    versionName = "0.8.1.2"
+	versionCode = 800102
+	versionName = "0.8.1.2"
 }
 
 wrapper {
